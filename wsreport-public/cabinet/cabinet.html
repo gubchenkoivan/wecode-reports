@@ -185,7 +185,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
     head.append(l, out); c.append(head);
     const PG = { ov: el('div', 'pg'), proj: el('div', 'pg'), recs: el('div', 'pg'), p80: el('div', 'pg'), sug: el('div', 'pg'), guide: el('div', 'pg') };
     const nav = el('nav', 'tabs'); nav.setAttribute('role', 'tablist');
-    const TABS = [['ov', '📊 Огляд', null], ['proj', '🗂 Мої проєкти', null], ['recs', '💡 Рекомендації', me.recs.filter((r) => r.sec !== 'ok').length], ['p80', '🎯 20/80', me.p80.filter((x) => x.top).length], ['sug', '✍️ Пропозиції', null], ['guide', '📖 Як це працює', null]];
+    const TABS = [['ov', '📊 Огляд', null], ['proj', '🗂 Мої проєкти', null], ['recs', '💡 Рекомендації', me.recs.filter((r) => r.sec !== 'ok').length], ['p80', '🎯 20/80', me.p80.filter((x) => x.top).length], ['sug', '✍️ Пропозиції', null], ['guide', '📖 Інструкція', null]];
     let tabCur = 'ov'; try { const t = localStorage.getItem('cab_tab'); if (PG[t]) tabCur = t; } catch (e) {}
     const showTab = (key) => { tabCur = key; try { localStorage.setItem('cab_tab', key); } catch (e) {} for (const k2 in PG) PG[k2].hidden = k2 !== key; nav.querySelectorAll('button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.k === key))); };
     TABS.forEach(([key, label, n]) => { const b = el('button', 'tab', label); b.type = 'button'; b.dataset.k = key; b.setAttribute('role', 'tab'); if (n) b.append(el('span', 'tbadge', String(n))); b.onclick = () => showTab(key); nav.append(b); });
