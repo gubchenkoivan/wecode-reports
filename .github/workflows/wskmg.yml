@@ -1,0 +1,67 @@
+name: wskmg
+run-name: "wskmg ${{ inputs.mode }} ${{ inputs.req }}"
+
+# Синхронизация реестра задач КазМунайГаз (Backlog.xlsx) с Worksection (wskmg.py).
+# Запускает задача Claude: строки файла передаются зашифрованными (payload), результат — в wsreport-public/kmg.enc.
+on:
+  workflow_dispatch:
+    inputs:
+      payload:
+        description: "Строки файла: gzip + AES (DASH_PASS) + base64"
+        required: true
+      mode:
+        description: "dry — только посчитать, send — создать подзадачи, rename — переименовать «КМГ №N» после перенумерации"
+        required: false
+        default: "dry"
+      req:
+        description: "Метка запроса (время), чтобы найти этот запуск"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wsreport
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: wsreport-public
+    env:
+      TZ: Europe/Kyiv
+      WS_API_KEY: ${{ secrets.WS_API_KEY }}
+      DASH_PASS: ${{ secrets.DASH_PASS }}
+      KMG_MODE: ${{ inputs.mode }}
+      KMG_PAYLOAD: ${{ inputs.payload }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Расшифровать настройки и строки файла
+        run: |
+          test -n "$DASH_PASS" || { echo "Нет секрета DASH_PASS"; exit 1; }
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:DASH_PASS -in state.enc | tar xzf - --no-same-permissions config.json
+          mkdir -p kmg
+          printf '%s' "$KMG_PAYLOAD" | openssl enc -d -a -A -aes-256-cbc -pbkdf2 -iter 200000 -pass env:DASH_PASS | gunzip > kmg/rows.json
+      - name: Синхронизация с Worksection
+        run: python wskmg.py
+      - name: Зашифровать и сохранить результат
+        if: always()
+        run: |
+          if [ -f kmg/result.json ]; then
+            tar czf - kmg/result.json | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:DASH_PASS -out kmg.enc
+          fi
+          rm -rf kmg config.json
+          git config user.name "wsreport-bot"
+          git config user.email "wsreport-bot@users.noreply.github.com"
+          [ -f kmg.enc ] && git add kmg.enc
+          git diff --cached --quiet && exit 0
+          git commit -m "wskmg ${KMG_MODE} ${{ inputs.req }}"
+          git pull --rebase origin main
+          git push

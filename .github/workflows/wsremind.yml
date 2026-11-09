@@ -1,0 +1,104 @@
+name: wsremind
+
+# Напоминания исполнителям о сроках задач в Worksection (wsremind.py).
+# Режим по умолчанию — send (пишет всем). Переопределить: переменная репозитория REMIND_MODE
+# = dry (ничего не пишет) или test (только задачи REMIND_TEST_EMAIL), либо поле mode при ручном запуске. Settings → Secrets and variables → Actions → Variables.
+on:
+  schedule:
+    # Всегда 9:00 по Киеву, только по будням. GitHub знает только UTC, поэтому два запуска:
+    # 07:00 UTC = 9:00 зимой (UTC+2), 06:00 UTC = 9:00 летом (UTC+3); лишний пропускается первым шагом.
+    - cron: "0 7 * * 1-5"
+    - cron: "0 6 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Режим: dry / test / send (пусто — из переменной REMIND_MODE)"
+        required: false
+        default: ""
+      task:
+        description: "Проверка: номер задачи — комментарий только в неё (без фильтров)"
+        required: false
+        default: ""
+      nudge:
+        description: "Порядок в задачах (fill/overdue/pause/done): dry / test / send (пусто — из переменной NUDGE_MODE, по умолчанию send)"
+        required: false
+        default: ""
+      date:
+        description: "Проверка: «сегодняшняя» дата YYYY-MM-DD (с mode=dry — посмотреть, сколько напоминаний будет в этот день)"
+        required: false
+        default: ""
+      cleanup:
+        description: "Удалить из задачи (номер) напоминания этого скрипта"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wsreport
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: wsreport-public
+    env:
+      TZ: Europe/Kyiv
+      WS_API_KEY: ${{ secrets.WS_API_KEY }}
+      DASH_PASS: ${{ secrets.DASH_PASS }}
+      REMIND_MODE: ${{ inputs.mode || vars.REMIND_MODE || 'send' }}
+      REMIND_TEST_EMAIL: ${{ vars.REMIND_TEST_EMAIL }}
+      REMIND_FROM: ${{ vars.REMIND_FROM }}
+      REMIND_TASK: ${{ inputs.task }}
+      NUDGE_MODE: ${{ inputs.nudge || vars.NUDGE_MODE || 'send' }}
+      NUDGE_SINCE: ${{ vars.NUDGE_SINCE || '2026-11-01' }}
+      REMIND_CLEANUP: ${{ inputs.cleanup }}
+      REMIND_DATE: ${{ inputs.date }}
+    steps:
+      - name: Только 9:00 по Киеву (зимнее/летнее время)
+        id: gate
+        working-directory: .
+        run: |
+          OFF=$(TZ=Europe/Kyiv date +%z)
+          RUN=yes
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "${{ github.event.schedule }}" = "0 7 * * 1-5" ] && [ "$OFF" != "+0200" ]; then RUN=no; fi
+            if [ "${{ github.event.schedule }}" = "0 6 * * 1-5" ] && [ "$OFF" != "+0300" ]; then RUN=no; fi
+          fi
+          echo "Киев UTC$OFF, запуск: $RUN"
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'yes'
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.run == 'yes'
+        with:
+          python-version: "3.12"
+      - name: Расшифровать настройки
+        if: steps.gate.outputs.run == 'yes'
+        run: |
+          test -n "$DASH_PASS" || { echo "Нет секрета DASH_PASS"; exit 1; }
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:DASH_PASS -in state.enc | tar xzf - --no-same-permissions config.json
+          if [ -f remind.enc ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:DASH_PASS -in remind.enc | tar xzf - --no-same-permissions
+          fi
+      - name: Напоминания о сроках
+        if: steps.gate.outputs.run == 'yes'
+        run: python wsremind.py
+      - name: Зашифровать и сохранить состояние
+        if: always() && steps.gate.outputs.run == 'yes'
+        run: |
+          if [ -f output/remind/state.json ]; then
+            tar czf - output/remind | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:DASH_PASS -out remind.enc
+          fi
+          rm -rf output config.json
+          git config user.name "wsreport-bot"
+          git config user.email "wsreport-bot@users.noreply.github.com"
+          [ -f remind.enc ] && git add remind.enc
+          git diff --cached --quiet && exit 0
+          git commit -m "wsremind $(date +%F)"
+          git pull --rebase origin main
+          git push

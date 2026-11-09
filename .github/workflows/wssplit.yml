@@ -1,0 +1,84 @@
+name: wssplit
+run-name: "wssplit #${{ inputs.task }} ${{ inputs.mode }}"
+
+# Разбить сводную задачу на подзадачи по записям трудозатрат (wssplit.py). Только ручной запуск.
+# По умолчанию dry — ничего не меняет, только считает. План и журнал шифруются в wsreport-public/split.enc.
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Номер сводной задачи"
+        required: true
+      group:
+        description: "Группировка: entry (каждая запись) / month (сотрудник + месяц) / person (сотрудник)"
+        required: false
+        default: "entry"
+      move:
+        description: "Переносить записи времени в подзадачи: yes / no"
+        required: false
+        default: "yes"
+      mode:
+        description: "dry — только посчитать, send — создать подзадачи"
+        required: false
+        default: "dry"
+      from:
+        description: "Только записи с даты YYYY-MM-DD (пусто — все)"
+        required: false
+        default: ""
+      to:
+        description: "Только записи по дату YYYY-MM-DD (пусто — все)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wsreport
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: wsreport-public
+    env:
+      TZ: Europe/Kyiv
+      WS_API_KEY: ${{ secrets.WS_API_KEY }}
+      DASH_PASS: ${{ secrets.DASH_PASS }}
+      SPLIT_TASK: ${{ inputs.task }}
+      SPLIT_GROUP: ${{ inputs.group }}
+      SPLIT_MOVE: ${{ inputs.move }}
+      SPLIT_MODE: ${{ inputs.mode }}
+      SPLIT_FROM: ${{ inputs.from }}
+      SPLIT_TO: ${{ inputs.to }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Расшифровать настройки
+        run: |
+          test -n "$DASH_PASS" || { echo "Нет секрета DASH_PASS"; exit 1; }
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:DASH_PASS -in state.enc | tar xzf - --no-same-permissions config.json
+          if [ -f split.enc ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:DASH_PASS -in split.enc | tar xzf - --no-same-permissions
+          fi
+      - name: Разбивка задачи
+        run: python wssplit.py
+      - name: Зашифровать и сохранить журнал
+        if: always()
+        run: |
+          if [ -d split ]; then
+            tar czf - split | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:DASH_PASS -out split.enc
+          fi
+          rm -rf split config.json
+          git config user.name "wsreport-bot"
+          git config user.email "wsreport-bot@users.noreply.github.com"
+          [ -f split.enc ] && git add split.enc
+          git diff --cached --quiet && exit 0
+          git commit -m "wssplit #${SPLIT_TASK} ${SPLIT_MODE}"
+          git pull --rebase origin main
+          git push

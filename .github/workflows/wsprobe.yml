@@ -1,0 +1,52 @@
+name: wsprobe
+run-name: "wsprobe"
+
+# Зонд API Worksection — только чтение (get_*). Ручной запуск. Ответы шифруются в wsreport-public/probe.enc.
+on:
+  workflow_dispatch:
+    inputs:
+      calls:
+        description: 'JSON-массив вызовов, например [{"action":"get_projects","extra":"options"}]'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wsreport
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: wsreport-public
+    env:
+      TZ: Europe/Kyiv
+      WS_API_KEY: ${{ secrets.WS_API_KEY }}
+      DASH_PASS: ${{ secrets.DASH_PASS }}
+      PROBE_CALLS: ${{ inputs.calls }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Расшифровать настройки
+        run: |
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:DASH_PASS -in state.enc | tar xzf - --no-same-permissions config.json
+      - name: Запросы
+        run: python wsprobe.py
+      - name: Зашифровать и сохранить
+        if: always()
+        run: |
+          [ -d probe ] && tar czf - probe | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:DASH_PASS -out probe.enc
+          rm -rf probe config.json
+          git config user.name "wsreport-bot"
+          git config user.email "wsreport-bot@users.noreply.github.com"
+          [ -f probe.enc ] && git add probe.enc
+          git diff --cached --quiet && exit 0
+          git commit -m "wsprobe"
+          git pull --rebase origin main
+          git push

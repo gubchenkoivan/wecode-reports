@@ -1,0 +1,357 @@
+<title>Кабінет фахівця We.Code</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: особистий кабінет — вхід → шапка з ім'ям → плитки показників → рекомендації дня → графік годин → мої задачі */
+:root{
+  --bg:#f4f6f8; --panel:#ffffff; --sunk:#eef1f4; --fg:#1d2430; --muted:#5e6878; --line:#dde2e8;
+  --accent:#2f5bd3; --accent-fg:#ffffff; --accent-soft:#e6ecfb;
+  --ok:#1f8a52; --ok-bg:#e3f4ea; --warn:#a36200; --warn-bg:#fbefd9; --bad:#c2321f; --bad-bg:#fbe5e1;
+  --f-ui:"Manrope", "Segoe UI", system-ui, sans-serif; --f-mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10141b; --panel:#171d26; --sunk:#131820; --fg:#e6eaf0; --muted:#98a3b3; --line:#283140;
+  --accent:#7b9dff; --accent-fg:#0b1430; --accent-soft:#1c2744;
+  --ok:#55c98b; --ok-bg:#15301f; --warn:#e7ae4c; --warn-bg:#33270f; --bad:#f08072; --bad-bg:#3a1a16; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10141b; --panel:#171d26; --sunk:#131820; --fg:#e6eaf0; --muted:#98a3b3; --line:#283140;
+  --accent:#7b9dff; --accent-fg:#0b1430; --accent-soft:#1c2744;
+  --ok:#55c98b; --ok-bg:#15301f; --warn:#e7ae4c; --warn-bg:#33270f; --bad:#f08072; --bad-bg:#3a1a16; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-ui);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1120px;margin:0 auto;display:grid;gap:18px}
+h1{font-size:28px;line-height:1.15;margin:0;font-weight:800;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0}
+a{color:var(--accent)}
+.muted{color:var(--muted)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:12px;min-width:0}
+button{font:inherit;font-weight:700;border-radius:9px;padding:9px 16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input{font:inherit;color:var(--fg);background:var(--sunk);border:1px solid var(--line);border-radius:9px;padding:10px 12px;width:100%;min-width:0}
+/* login */
+.login{max-width:420px;margin:8vh auto 0;display:grid;gap:14px}
+.login .brand{font:800 13px/1 var(--f-mono);letter-spacing:.12em;color:var(--accent)}
+.login form{display:grid;gap:10px}
+.login label{font-size:13px;font-weight:600;color:var(--muted)}
+.pwrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.err{color:var(--bad);font-size:14px;min-height:1.5em}
+/* head */
+.head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:10px 20px}
+.who{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;color:var(--muted);font-size:14px;margin-top:4px}
+.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;background:var(--sunk);border:1px solid var(--line);color:var(--muted)}
+.pill.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}.pill.warn{background:var(--warn-bg);color:var(--warn);border-color:transparent}.pill.bad{background:var(--bad-bg);color:var(--bad);border-color:transparent}
+/* kpis */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:4px;align-content:start}
+.kpi span{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.kpi b{font-size:28px;line-height:1.1;font-weight:800;font-variant-numeric:tabular-nums}
+.kpi small{color:var(--muted);font-size:13px}
+.kpi.ok{border-color:var(--ok)} .kpi.ok b{color:var(--ok)} .kpi.warn{border-color:var(--warn)} .kpi.warn b{color:var(--warn)} .kpi.bad{border-color:var(--bad)} .kpi.bad b{color:var(--bad)}
+.bar{height:8px;border-radius:99px;background:var(--sunk);overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+/* recs */
+.recs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px}
+.rec{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;padding:12px 14px;display:grid;gap:8px;background:var(--panel);align-content:start;min-width:0}
+.rec.bad{border-left-color:var(--bad)} .rec.warn{border-left-color:var(--warn)} .rec.ok{border-left-color:var(--ok)}
+.rec h3{margin:0;font-size:15px;display:flex;gap:8px;align-items:center}
+.rec p{margin:0;font-size:14px}
+.rec ul{margin:0;padding-left:18px;display:grid;gap:3px;font-size:13px}
+.rec li{overflow-wrap:anywhere}
+.note{font-size:13px;color:var(--muted);background:var(--sunk);border-radius:10px;padding:10px 12px}
+/* chart */
+.chart svg{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font:11px var(--f-ui)}
+/* tasks */
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+.filters button{padding:5px 12px;font-size:13px;font-weight:600;border-radius:999px}
+.filters button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;background:var(--sunk);position:sticky;top:0}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+.late{color:var(--bad);font-weight:700}
+.stg{font:600 11px var(--f-mono);padding:2px 6px;border-radius:5px;background:var(--sunk);white-space:nowrap}
+.cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;font-size:14px}
+.cmp div{background:var(--sunk);border-radius:10px;padding:10px 12px}
+textarea{font:inherit;color:var(--fg);background:var(--sunk);border:1px solid var(--line);border-radius:9px;padding:10px 12px;width:100%;min-height:90px;resize:vertical}
+select{font:inherit;color:var(--fg);background:var(--sunk);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+.sg-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sg-list{display:grid;gap:8px}
+.sg{border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:grid;gap:6px}
+.sg .t{font-size:15px;font-weight:600;white-space:pre-wrap;overflow-wrap:anywhere}
+.sg .m{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.sg .rp{border-left:3px solid var(--line);padding-left:10px;font-size:13px;white-space:pre-wrap}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--line);padding-bottom:10px}
+.tab{border-radius:999px;padding:8px 16px;font-weight:700;display:inline-flex;gap:6px;align-items:center}
+.tab[aria-selected=true]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+.tbadge{min-width:20px;padding:0 6px;border-radius:999px;background:var(--bad);color:#fff;font-size:11px;line-height:18px;text-align:center}
+.pg{display:grid;gap:18px}
+tr.dim td{color:var(--muted)}
+.guide{max-width:820px}
+.guide h3{font-size:17px;margin:14px 0 2px}
+.guide p,.guide li,.guide dd{font-size:14.5px;line-height:1.6}
+.guide p{margin:0}
+.guide .lead{font-size:16px}
+.guide ul{margin:0;padding-left:20px;display:grid;gap:4px}
+.guide dl{margin:0;display:grid;gap:8px}
+.guide dt{font-weight:700}
+.guide dd{margin:0 0 0 0;color:var(--muted)}
+.small{font-size:12.5px}
+.mcell{position:relative;min-width:72px}
+.mcell i{display:block;height:4px;border-radius:9px;background:var(--line);margin-top:4px}
+.mcell i.cur{background:var(--accent)}
+.warnc{color:var(--warn);font-weight:700}
+table.ptab{min-width:860px}
+footer{font-size:13px;color:var(--muted);text-align:center}
+</style>
+
+<div class="wrap" id="app">
+  <section class="login panel" id="login" aria-label="Вхід">
+    <div class="brand">WE.CODE · КАБІНЕТ</div>
+    <h1>Мій кабінет</h1>
+    <p class="muted" style="margin:0">Ваш особистий перформанс і рекомендації на день. Логін і пароль видає керівник напряму.</p>
+    <form id="lf" autocomplete="on">
+      <label for="lg">Логін</label>
+      <input id="lg" name="username" autocomplete="username" placeholder="наприклад, ivan.petrenko" required>
+      <label for="pw">Пароль</label>
+      <div class="pwrow"><input id="pw" name="password" type="password" autocomplete="current-password" placeholder="xxxx-xxxx-xxxx" required><button type="button" id="eye" aria-label="Показати пароль">👁</button></div>
+      <div class="err" id="err" role="alert"></div>
+      <button class="primary" id="go" type="submit">Увійти</button>
+    </form>
+    <p class="note">Дані зашифровані вашим паролем і розшифровуються лише у вашому браузері. Без пароля їх не прочитати, навіть маючи посилання. Пароль нікому не передавайте.</p>
+  </section>
+  <div id="cab" hidden></div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+  const pct = (x) => x == null ? '—' : Math.round(x * 100) + '%';
+  const h1 = (x) => x == null ? '—' : (Math.round(x * 10) / 10).toLocaleString('uk-UA');
+  const fmtD = (s) => s ? s.slice(8, 10) + '.' + s.slice(5, 7) : '—';
+  const MONTHS = ['січень', 'лютий', 'березень', 'квітень', 'травень', 'червень', 'липень', 'серпень', 'вересень', 'жовтень', 'листопад', 'грудень'];
+  const ST = { 'Дотягивает': ['ok', 'Виходжу на норму'], 'Риск': ['warn', 'Ризик'], 'Не дотягивает': ['bad', 'Не дотягую'] };
+  const SEC = { norm: ['📈', 'Норма'], overdue: ['⏰', 'Прострочені'], soon: ['📅', 'Строки найближчими днями'], stage: ['▶️', 'Етап не відповідає'],
+    nostage: ['🏷', 'Без етапу'], nopay: ['💳', 'Без типу оплати'], pause: ['⏸', 'На паузі'], overrun: ['🔥', 'Перевищено оцінку'],
+    estimate: ['📐', 'Без оцінки часу'], tails: ['🧾', 'Хвости минулих місяців'], timer: ['⏱', 'Таймер'], ok: ['✅', 'Усе добре'] };
+  const SEV = { overdue: 'bad', overrun: 'bad', tails: 'warn', nopay: 'warn', nostage: 'warn', stage: 'warn', pause: 'warn', soon: 'warn', ok: 'ok' };
+  let DATA = null;
+  try { const l = localStorage.getItem('cab_login'); if (l) $('lg').value = l; } catch (e) {}
+  $('eye').onclick = () => { const p = $('pw'); p.type = p.type === 'password' ? 'text' : 'password'; };
+
+  const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  async function sha(s) { const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join(''); }
+  async function loadData() { if (DATA) return DATA; const r = await fetch('personal.json', { cache: 'no-store' }); if (!r.ok) throw new Error('file'); DATA = await r.json(); return DATA; }
+  async function unlock(login, pass) {
+    const d = await loadData(); const k = await sha('wecode:' + login.trim().toLowerCase());
+    const e = d.entries.find((x) => x.k === k); if (!e) return null;
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass.trim()), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64(e.s), iterations: d.iter || 200000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    try { const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(e.iv) }, key, b64(e.ct)); return JSON.parse(new TextDecoder().decode(pt)); } catch (x) { return null; }
+  }
+  $('lf').addEventListener('submit', async (ev) => {
+    ev.preventDefault(); $('err').textContent = ''; $('go').disabled = true; $('go').textContent = 'Перевіряю…';
+    try {
+      const me = await unlock($('lg').value, $('pw').value);
+      if (!me) { $('err').textContent = 'Невірний логін або пароль. Перевірте розкладку й регістр або зверніться до керівника.'; return; }
+      try { localStorage.setItem('cab_login', $('lg').value.trim().toLowerCase()); } catch (e) {}
+      $('pw').value = ''; render(me);
+    } catch (e) { $('err').textContent = e.message === 'file' ? 'Не вдалося завантажити дані. Оновіть сторінку.' : 'Цей браузер не підтримує шифрування — відкрийте кабінет у Chrome, Edge, Safari або Firefox.'; }
+    finally { $('go').disabled = false; $('go').textContent = 'Увійти'; }
+  });
+
+  function kpi(box, label, value, sub, cls, progress) {
+    const d = el('div', 'kpi' + (cls ? ' ' + cls : '')); d.append(el('span', null, label), el('b', null, value));
+    if (progress != null) { const b = el('div', 'bar'); const i = el('i'); i.style.width = Math.max(0, Math.min(100, progress * 100)) + '%'; b.append(i); d.append(b); }
+    if (sub) d.append(el('small', null, sub)); box.append(d);
+  }
+  function taskLink(t) { const a = el('a', null, t.t.length > 90 ? t.t.slice(0, 90) + '…' : t.t); a.href = t.u; a.target = '_blank'; a.rel = 'noopener'; return a; }
+
+  function render(me) {
+    $('login').hidden = true; const c = $('cab'); c.hidden = false; c.replaceChildren(); c.className = 'wrap';
+    const k = me.k; const [mY, mM] = me.month.split('-').map(Number);
+    // head
+    const head = el('div', 'head'); const l = el('div');
+    l.append(el('h1', null, 'Привіт, ' + me.name + '!'));
+    const who = el('div', 'who'); who.append(el('span', null, me.dept), el('span', 'pill', me.type === 'PT' ? 'Парт-тайм' : 'Фул-тайм'), el('span', null, (me.lead ? 'Керівник · ' : '') + MONTHS[mM - 1] + ' ' + mY + ' · дані на ' + fmtD(me.date)));
+    const st = ST[k.status] || ['', k.status || '']; if (st[1]) who.append(el('span', 'pill ' + st[0], st[1]));
+    l.append(who); const out = el('button', null, 'Вийти'); out.onclick = () => { c.hidden = true; c.replaceChildren(); $('login').hidden = false; $('pw').focus(); };
+    head.append(l, out); c.append(head);
+    const PG = { ov: el('div', 'pg'), proj: el('div', 'pg'), recs: el('div', 'pg'), p80: el('div', 'pg'), sug: el('div', 'pg'), guide: el('div', 'pg') };
+    const nav = el('nav', 'tabs'); nav.setAttribute('role', 'tablist');
+    const TABS = [['ov', '📊 Огляд', null], ['proj', '🗂 Мої проєкти', null], ['recs', '💡 Рекомендації', me.recs.filter((r) => r.sec !== 'ok').length], ['p80', '🎯 20/80', me.p80.filter((x) => x.top).length], ['sug', '✍️ Пропозиції', null], ['guide', '📖 Як це працює', null]];
+    let tabCur = 'ov'; try { const t = localStorage.getItem('cab_tab'); if (PG[t]) tabCur = t; } catch (e) {}
+    const showTab = (key) => { tabCur = key; try { localStorage.setItem('cab_tab', key); } catch (e) {} for (const k2 in PG) PG[k2].hidden = k2 !== key; nav.querySelectorAll('button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.k === key))); };
+    TABS.forEach(([key, label, n]) => { const b = el('button', 'tab', label); b.type = 'button'; b.dataset.k = key; b.setAttribute('role', 'tab'); if (n) b.append(el('span', 'tbadge', String(n))); b.onclick = () => showTab(key); nav.append(b); });
+    c.append(nav, PG.ov, PG.proj, PG.recs, PG.p80, PG.sug, PG.guide);
+    PG.proj.append(projBox(me));
+    const gd = el('section', 'panel guide'); gd.innerHTML = GUIDE; PG.guide.append(gd);
+    // kpis
+    const ks = el('div', 'kpis');
+    kpi(ks, 'Години до норми', h1(k.counted_mtd) + ' / ' + k.norm, pct(k.norm_progress) + ' норми · робочих днів ' + k.wd_elapsed + ' з ' + k.wd_total, '', k.norm_progress);
+    kpi(ks, 'Прогноз на місяць', pct(k.forecast_progress), '≈ ' + Math.round(k.forecast || 0) + ' відпрацьованих год при поточному темпі · скільки з них оплатять — залежить від швидкості та якості реалізації', st[0]);
+    kpi(ks, 'Потрібно на день', h1(k.need_per_day) + ' год', 'щоб вийти на норму');
+    kpi(ks, 'Закрито задач', String(k.closed_mtd ?? 0), 'учора: ' + (k.closed_yesterday ?? 0) + ' · вчасно ' + pct(k.on_time_rate), '');
+    const lateL = me.tasks.filter((t) => t.od > 0 && !/^(DONE|TESTING)/.test((t.st || '').replace(/\((ІТС|ИТС)\)/, '').trim().toUpperCase())); const maxOd = lateL.reduce((m, t) => Math.max(m, t.od), 0);
+    kpi(ks, 'Прострочені', String(lateL.length), lateL.length ? 'найдовша — ' + maxOd + ' дн.' : 'усе вчасно', lateL.length ? 'bad' : 'ok');
+    kpi(ks, 'Відкриті задачі', String(k.open_tasks ?? 0), 'хвостів у роботі: ' + me.tails.work + ' (' + h1(me.tails.work_h) + ' год)');
+    PG.ov.append(ks);
+    // recs
+    const rp = el('section', 'panel'); rp.append(el('h2', null, 'Рекомендації на сьогодні'));
+    rp.append(el('p', 'note', 'Рекомендації побудовані автоматично на основі статистики Worksection. Перевіряйте їх перед виконанням: якщо щось не так — напишіть керівнику.'));
+    const rs = el('div', 'recs');
+    for (const r of me.recs) {
+      const [ic, title] = SEC[r.sec] || ['•', r.sec]; const box = el('div', 'rec ' + (SEV[r.sec] || ''));
+      const h = el('h3'); h.append(el('span', null, ic), el('span', null, title)); box.append(h, el('p', null, r.text));
+      if (r.items.length) { const ul = el('ul'); for (const t of r.items) { const li = el('li'); li.append(taskLink(t));
+        const extra = t.od ? ' — прострочено ' + t.od + ' дн.' : t.dd != null ? ' — строк ' + fmtD(t.dl) : t.pct ? ' — ' + t.ft + ' з ' + t.pl + ' год (' + t.pct + '%)' : t.age ? ' — ' + t.age + ' дн., ' + t.ft + ' год' : '';
+        li.append(el('span', 'muted', extra)); ul.append(li); } box.append(ul); }
+      rs.append(box);
+    }
+    rp.append(rs); PG.recs.append(rp);
+    PG.sug.append(suggestBox(me));
+    PG.p80.append(p80Box(me));
+    // chart
+    const cp = el('section', 'panel chart'); cp.append(el('h2', null, 'Години по днях (останні 30 днів)'));
+    cp.append(chart(me.daily, k.norm / Math.max(1, k.wd_total))); PG.ov.append(cp);
+    // compare
+    if (me.prev) { const pp = el('section', 'panel'); pp.append(el('h2', null, 'Минулий місяць'));
+      const g = el('div', 'cmp'); const p = me.prev; const ps = ST[p.status] || ['', p.status || ''];
+      g.append(Object.assign(el('div'), { textContent: 'Години до норми: ' + h1(p.counted_mtd) + ' з ' + p.norm + ' (' + pct(p.norm_progress) + ')' }),
+        Object.assign(el('div'), { textContent: 'Підсумок: ' + (ps[1] || '—') }), Object.assign(el('div'), { textContent: 'Закрито задач: ' + (p.closed_mtd ?? '—') + ' · вчасно ' + pct(p.on_time_rate) }));
+      pp.append(g); PG.ov.append(pp); }
+    // tasks
+    const tp = el('section', 'panel'); tp.append(el('h2', null, 'Мої відкриті задачі (' + me.tasks.length + ')'));
+    const F = [['all', 'Усі'], ['late', 'Прострочені'], ['nostage', 'Без етапу'], ['nopay', 'Без типу оплати'], ['pause', 'PAUSE'], ['testing', 'На прийманні']];
+    const base = (s) => (s || '').replace(/\((ІТС|ИТС)\)/, '').trim().toUpperCase();
+    const test = { all: () => true, late: (t) => t.od > 0 && !/^(DONE|TESTING)/.test(base(t.st)), nostage: (t) => !base(t.st) || /^(ІТС|ИТС)$/.test(base(t.st)), nopay: (t) => !t.pay, pause: (t) => base(t.st) === 'PAUSE', testing: (t) => /^TESTING|^DONE/.test(base(t.st)) };
+    const fl = el('div', 'filters'); let cur = 'all'; const tw = el('div', 'tw');
+    const draw = () => { tw.replaceChildren(); const tb = el('table'); const th = el('thead'); const hr = el('tr');
+      ['Задача', 'Проєкт', 'Етап', 'Строк', 'План / факт, год'].forEach((x) => hr.append(el('th', null, x))); th.append(hr); tb.append(th);
+      const body = el('tbody'); const L = me.tasks.filter(test[cur]);
+      if (!L.length) { const r = el('tr'); const d = el('td', 'muted', 'Задач у цьому фільтрі немає.'); d.colSpan = 5; r.append(d); body.append(r); }
+      for (const t of L) { const r = el('tr'); const a = el('td'); a.append(taskLink(t)); const s = el('td'); s.append(el('span', 'stg', t.st || 'без етапу'));
+        const dl = el('td', 'n' + (test.late(t) ? ' late' : ''), t.dl ? fmtD(t.dl) + (test.late(t) ? ' (+' + t.od + ')' : '') : '—');
+        const over = t.pl && t.ft > t.pl; r.append(a, el('td', null, t.p), s, dl, el('td', 'n' + (over ? ' late' : ''), (t.pl ?? '—') + ' / ' + h1(t.ft))); body.append(r); }
+      tb.append(body); tw.append(tb); };
+    F.forEach(([key, label]) => { const n = me.tasks.filter(test[key]).length; const b = el('button', null, label + ' · ' + n); b.type = 'button'; b.setAttribute('aria-pressed', String(key === cur));
+      b.onclick = () => { cur = key; fl.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); draw(); }; fl.append(b); });
+    tp.append(fl, tw); draw(); PG.ov.append(tp); showTab(tabCur);
+    c.append(el('footer', null, 'Дані з Worksection оновлюються щоночі. Питання щодо цифр — до керівника напряму. 🤖 We.bit'));
+    window.scrollTo(0, 0);
+  }
+
+  const GUIDE = "<h2>📖 Як працює кабінет</h2>\n<p class=\"lead\">Кабінет показує ваш особистий перформанс за місяць, рекомендації на день і задачі, які варто довести до оплати першими. Усі цифри беруться з Worksection — з ваших записів часу, етапів і строків задач.</p>\n\n<h3>🔐 Вхід і безпека</h3>\n<ul>\n<li>Логін і пароль видає керівник. Пароль особистий — не передавайте його нікому.</li>\n<li>Ваші дані зашифровані вашим паролем і розшифровуються лише у вашому браузері. Навіть маючи посилання, без пароля їх не прочитати, а інших співробітників ви не бачите.</li>\n<li>Кнопка «Вийти» закриває кабінет на цьому пристрої. Пароль браузер не запам'ятовує, лише логін.</li>\n</ul>\n\n<h3>🔄 Оновлення даних</h3>\n<ul>\n<li>Дані оновлюються щоночі. Дата оновлення — у шапці («дані на ДД.ММ»).</li>\n<li>Зміни, які ви зробили в Worksection сьогодні (новий етап, строк, записаний час), з'являться в кабінеті наступного ранку.</li>\n</ul>\n\n<h3>📊 Огляд — плитки показників</h3>\n<dl>\n<dt>Години до норми</dt><dd>Години за місяць, які зараховуються до норми, і ваша особиста норма. Не зараховуються задачі з типом «Гарантія» та етапами CLOSE-Won / CLOSE-Lost. Смуга — скільки норми вже виконано.</dd>\n<dt>Прогноз на місяць</dt><dd>Скільки годин буде на кінець місяця, якщо працювати в теперішньому темпі: середні години за звичайний робочий день × робочі дні, що залишились. На початку місяця прогноз «стрибає» — він стабілізується за кілька днів. <b>Важливо:</b> прогноз будується за <b>відпрацьованими</b> годинами. Які з них будуть оплачені, залежить від швидкості реалізації (як швидко задачу здано і прийнято клієнтом) та якості реалізації (чи прийнято без повернень і доопрацювань).</dd>\n<dt>Статус</dt><dd>За прогнозом до норми: від 100% — «Виходжу на норму», 85–99% — «Ризик», нижче 85% — «Не дотягую».</dd>\n<dt>Потрібно на день</dt><dd>Скільки годин на день у середньому потрібно до кінця місяця, щоб вийти на норму.</dd>\n<dt>Закрито задач</dt><dd>Скільки задач закрито за місяць і за вчора; «вчасно» — частка задач, закритих не пізніше строку.</dd>\n<dt>Прострочені</dt><dd>Відкриті задачі, у яких минув строк, а етап ще не DONE чи TESTING. Найдовша — на скільки днів прострочена найстаріша.</dd>\n<dt>Відкриті задачі</dt><dd>Усі ваші незакриті задачі; хвости — задачі минулих місяців, що ще в роботі.</dd>\n</dl>\n<ul>\n<li><b>Графік</b> — години по днях за останні 30 днів. Сірі стовпці — вихідні, пунктир — денна норма (місячна норма ÷ робочі дні місяця).</li>\n<li><b>Минулий місяць</b> — підсумок для порівняння.</li>\n<li><b>Мої відкриті задачі</b> — фільтри «Прострочені», «Без етапу», «Без типу оплати», PAUSE, «На прийманні». Червоним — прострочений строк і перевищення оцінки (факт більше плану). Назва задачі — посилання у Worksection.</li>\n</ul>\n\n<h3>🗂 Мої проєкти</h3>\n<ul>\n<li>Проєкти, де у вас є відкриті задачі або записаний час за останні три місяці, з менеджером проєкту.</li>\n<li>Години по місяцях — ваш час на задачах проєкту; поточний місяць виділено.</li>\n<li><b>Моя частка часу</b> — яка частина ваших годин цього місяця пішла на проєкт. <b>Частка в проєкті</b> — яку частину годин усієї команди на проєкті цього місяця записали ви (і скільки людей працює на проєкті).</li>\n<li><b>Задачі</b> — відкриті й прострочені задачі на проєкті. <b>Неоплачено</b> — ваші задачі в DONE і TESTING BY CLIENT без PAID\\CLOSE.</li>\n</ul>\n\n<h3>💡 Рекомендації</h3>\n<p>Щоденний список того, що варто зробити, з посиланнями на конкретні задачі. Цифра на вкладці — скільки рекомендацій сьогодні. Можливі розділи:</p>\n<ul>\n<li><b>Норма</b> — скільки годин на день потрібно до норми.</li>\n<li><b>Прострочені</b> і <b>Строки найближчими днями</b> — оновити строк чи етап або встигнути вчасно.</li>\n<li><b>Етап не відповідає</b> — години вже є, а етап ще не IN PROGRESS.</li>\n<li><b>Без етапу</b>, <b>Без типу оплати</b> — заповнити, інакше години неправильно потрапляють у звіти.</li>\n<li><b>На паузі</b> — вирішити: повернути в роботу, перенести в PLANNED або закрити CANCELLED.</li>\n<li><b>Перевищено оцінку</b> — попередити менеджера проєкту, щоб погодити нову оцінку з клієнтом.</li>\n<li><b>Без оцінки часу</b>, <b>Хвости минулих місяців</b>, <b>Таймер</b>.</li>\n</ul>\n<p class=\"muted\">Рекомендації будуються автоматично за статистикою. Перевіряйте їх перед виконанням: якщо щось не так — напишіть керівнику.</p>\n\n<h3>🎯 20/80</h3>\n<ul>\n<li>Задачі в DONE і TESTING BY CLIENT, які ще не оплачені (немає PAID\\CLOSE), — з поточного й минулих місяців.</li>\n<li>Вони відсортовані за годинами. Позначка «20/80» — задачі, які разом дають перші 80% годин до оплати. Зазвичай це невелика частина задач, тому їх доводимо першими.</li>\n<li>TESTING BY CLIENT — домовитися з клієнтом про приймання. DONE — нагадати менеджеру проєкту виставити акт.</li>\n<li>Задача зникає зі списку, коли в Worksection з'являється PAID\\CLOSE.</li>\n</ul>\n\n<h3>✍️ Пропозиції</h3>\n<ul>\n<li>Напишіть, що можна покращити в роботі, процесах, звітах чи інструментах, оберіть тему і натисніть «Надіслати».</li>\n<li>Пропозиція потрапляє керівникам у дашборд IT-команд (вкладка «Ідеї та пропозиції») — зазвичай наступного ранку.</li>\n<li>Статус («На розгляді», «Додано», «Відмова») і відповідь керівника з'являться в «Мої пропозиції».</li>\n<li>Свої пропозиції бачите лише ви і керівники. Щоб надсилати, відкрийте кабінет, увійшовши у свій акаунт claude.ai.</li>\n</ul>\n\n<h3>🤖 We.bit у Worksection</h3>\n<p>Окрім кабінету, помічник We.bit пише коментарі прямо в задачах: про строк за 4 робочі дні, незаповнений тип оплати чи етап, прострочку, задачі на паузі понад 15 днів. Якщо нічого не змінилось — нагадує раз на 3 робочі дні, а коли виправили — каже «Дякую за роботу!».</p>\n\n<h3>❓ Якщо цифри не збігаються</h3>\n<ul>\n<li>Перевірте дату даних у шапці — сьогоднішні зміни з'являться завтра.</li>\n<li>Перевірте задачу у Worksection: етап, тип оплати, строк, записи часу.</li>\n<li>Якщо все одно щось не так — напишіть керівнику напряму.</li>\n</ul>";
+  // ---------- мої проєкти ----------
+  function projBox(me) {
+    const p = el('section', 'panel'); p.append(el('h2', null, '🗂 Мої проєкти'));
+    const P = (me.projects && me.projects.list) || []; const M = (me.projects && me.projects.months) || []; const cur = me.month;
+    p.append(el('p', 'muted', 'Проєкти, де у вас є відкриті задачі або записаний час за останні три місяці. Частка в проєкті — яку частину годин команди на проєкті цього місяця записали саме ви.'));
+    const active = P.filter((x) => x.open > 0); const curH = P.reduce((s, x) => s + (x.h[cur] || 0), 0); const main = P.slice().sort((a, b) => (b.h[cur] || 0) - (a.h[cur] || 0))[0];
+    const ks = el('div', 'kpis');
+    kpi(ks, 'Проєктів', String(P.length), 'з відкритими задачами: ' + active.length);
+    kpi(ks, 'Годин цього місяця', h1(curH), 'по всіх проєктах');
+    kpi(ks, 'Основний проєкт', main && main.h[cur] ? Math.round(main.share_my * 100) + '%' : '—', main && main.h[cur] ? main.p : 'цього місяця годин ще немає');
+    kpi(ks, 'Неоплачені години', h1(P.reduce((s, x) => s + x.unpaid, 0)), 'DONE і TESTING BY CLIENT по проєктах', P.some((x) => x.unpaid) ? 'warn' : '');
+    p.append(ks);
+    if (!P.length) { p.append(el('p', 'note', 'Проєктів за останні три місяці немає.')); return p; }
+    const mx = Math.max(1, ...P.flatMap((x) => M.map((m) => x.h[m] || 0)));
+    const MN = (m) => MONTHS[+m.slice(5, 7) - 1].slice(0, 3);
+    const tw = el('div', 'tw'); const tb = el('table', 'ptab'); const th = el('thead'); const hr = el('tr');
+    ['Проєкт', 'Менеджер', ...M.map((m) => MN(m) + (m === cur ? ' (зараз)' : '')), 'Моя частка часу', 'Частка в проєкті', 'Задачі', 'Неоплачено'].forEach((x) => hr.append(el('th', null, x)));
+    th.append(hr); tb.append(th); const body = el('tbody');
+    for (const x of P) {
+      const r = el('tr'); const a = el('td'); a.append(el('b', null, x.p)); const TY = { 'Сопровождение': 'Супровід', 'Внедрение': 'Впровадження', 'Внутреннее': 'Внутрішній', 'Разработка': 'Розробка' }; const sub = [TY[x.type] || x.type, x.client && !x.p.includes(x.client) ? x.client : ''].filter(Boolean).join(' · '); if (sub) a.append(el('div', 'muted small', sub));
+      r.append(a, el('td', null, x.mgr || '—'));
+      for (const m of M) { const v = x.h[m] || 0; const d = el('td', 'n mcell'); const bar = el('i'); bar.style.width = Math.round(100 * v / mx) + '%'; if (m === cur) bar.className = 'cur'; d.append(el('span', null, v ? h1(v) : '—'), bar); r.append(d); }
+      r.append(el('td', 'n', x.h[cur] ? Math.round(x.share_my * 100) + '%' : '—'));
+      r.append(el('td', 'n', x.share_proj != null && x.h[cur] ? Math.round(x.share_proj * 100) + '%' + (x.people ? ' · ' + x.people + ' люд.' : '') : '—'));
+      const tt = el('td', 'n'); tt.append(el('span', null, x.open + ' відкр.')); if (x.late) tt.append(el('span', 'late', ' · ' + x.late + ' простр.')); r.append(tt);
+      r.append(el('td', 'n' + (x.unpaid ? ' warnc' : ''), x.unpaid ? h1(x.unpaid) + ' год (' + x.unpaid_n + ')' : '—'));
+      body.append(r);
+    }
+    tb.append(body); tw.append(tb); p.append(tw);
+    p.append(el('p', 'muted small', 'Години по місяцях — ваш час на задачах проєкту. «Неоплачено» — ваші задачі проєкту в DONE і TESTING BY CLIENT без PAID\\CLOSE (детально — на вкладці 20/80).'));
+    return p;
+  }
+
+  // ---------- 20/80 ----------
+  function p80Box(me) {
+    const p = el('section', 'panel'); p.append(el('h2', null, '🎯 20/80 — що довести до оплати першим'));
+    const L = me.p80; const tot = L.reduce((s, x) => s + x.h, 0); const top = L.filter((x) => x.top); const topH = top.reduce((s, x) => s + x.h, 0);
+    p.append(el('p', 'muted', 'Задачі в DONE і TESTING BY CLIENT, які ще не оплачені (немає PAID\\CLOSE), за спаданням годин. Невелика частина задач дає 80% усіх годин до оплати — їх доводимо першими: TESTING BY CLIENT — домовитися з клієнтом про приймання, DONE — нагадати менеджеру проєкту виставити акт.'));
+    const ks = el('div', 'kpis');
+    kpi(ks, 'Годин до оплати', h1(tot), L.length + ' задач у DONE і TESTING BY CLIENT');
+    kpi(ks, '20/80', top.length + ' задач', h1(topH) + ' год — ' + (tot ? Math.round(100 * topH / tot) : 0) + '% усіх годин до оплати', top.length ? 'warn' : 'ok');
+    kpi(ks, 'Найстаріша', L.length ? (L.reduce((m, x) => Math.max(m, x.age || 0), 0) + ' дн.') : '—', 'серед задач минулих місяців');
+    p.append(ks);
+    if (!L.length) { p.append(el('p', 'note', 'Немає зданих неоплачених задач — усе закрито. 💚')); return p; }
+    const tw = el('div', 'tw'); const tb = el('table'); const th = el('thead'); const hr = el('tr');
+    ['#', 'Задача', 'Проєкт', 'Етап', 'Місяць', 'Годин', 'Накопичено'].forEach((x) => hr.append(el('th', null, x))); th.append(hr); tb.append(th);
+    const body = el('tbody'); L.forEach((x, i) => { const r = el('tr'); if (!x.top) r.className = 'dim';
+      const a = el('td'); a.append(taskLink(x)); if (x.top) a.prepend(el('span', 'pill warn', '20/80'), ' ');
+      const sg = el('td'); sg.append(el('span', 'stg', x.st));
+      r.append(el('td', 'n', String(i + 1)), a, el('td', null, x.p), sg, el('td', 'n', x.m ? x.m.slice(5, 7) + '.' + x.m.slice(0, 4) : '—'), el('td', 'n', h1(x.h)), el('td', 'n', x.cum + '%')); body.append(r); });
+    tb.append(body); tw.append(tb); p.append(tw); return p;
+  }
+
+  // ---------- пропозиції ----------
+  const SGST = { '': ['', 'На розгляді'], done: ['ok', 'Додано'], no: ['bad', 'Відмова'] };
+  const CATS = ['Робота і процеси', 'Дашборди і звіти', 'Інструменти та автоматизація', 'Інше'];
+  let DB = null, UID = null, MYDOC = null, sgUnsub = null;
+  const capReady = (async () => { try { const cl = window.claude; if (!cl || !cl.use) return; const [db, u] = await Promise.all([cl.use('db'), cl.use('user')]); if (db && u) { const id = await u.id(); if (id) { DB = db; UID = id; } } } catch (e) {} })();
+  function suggestBox(me) {
+    const p = el('section', 'panel'); p.append(el('h2', null, '💡 Пропозиції щодо поліпшення'));
+    p.append(el('p', 'muted', 'Що можна покращити в роботі, процесах, дашбордах чи інструментах? Пропозицію побачать керівники в дашборді IT-команд, на вкладці «Ідеї та пропозиції», — зазвичай наступного робочого ранку. Статус і відповідь керівника з’являться тут.'));
+    const row = el('div', 'sg-row'); const cat = el('select'); cat.id = 'sgcat'; cat.setAttribute('aria-label', 'Тема'); CATS.forEach((c) => cat.append(new Option(c, c)));
+    const ta = el('textarea'); ta.id = 'sgtext'; ta.placeholder = 'Опишіть пропозицію: що змінити, навіщо і як це допоможе';
+    const bt = el('button', 'primary', 'Надіслати'); bt.type = 'button'; const msg = el('span', 'muted'); row.append(cat, bt, msg);
+    const list = el('div', 'sg-list'); p.append(ta, row, el('h2', null, 'Мої пропозиції'), list);
+    const paint = () => { list.replaceChildren(); const items = ((MYDOC && MYDOC.items) || []).slice().sort((a, b) => String(b.at).localeCompare(String(a.at)));
+      if (!items.length) { list.append(el('p', 'muted', 'Ви ще не надсилали пропозицій.')); return; }
+      for (const it of items) { const d = el('div', 'sg'); const [cl, lb] = SGST[it.st || ''] || SGST['']; const m = el('div', 'm');
+        m.append(el('span', 'pill ' + cl, it.ideaId ? lb : 'Надіслано'), el('span', null, it.cat || ''), el('span', null, fmtD((it.at || '').slice(0, 10)) + '.' + (it.at || '').slice(0, 4)));
+        d.append(m, el('div', 't', it.text)); (it.replies || []).forEach((r) => d.append(el('div', 'rp', (r.by || 'Керівник') + ': ' + r.text))); list.append(d); } };
+    capReady.then(() => {
+      if (!DB) { ta.disabled = true; bt.disabled = true; msg.textContent = 'Щоб надсилати пропозиції, відкрийте кабінет, увійшовши у свій акаунт claude.ai.'; paint(); return; }
+      if (sgUnsub) sgUnsub();
+      sgUnsub = DB.doc('suggestions/' + UID).onSnapshot((snap) => { MYDOC = snap.exists ? snap.data() : null; paint(); }, () => paint());
+    });
+    bt.onclick = async () => {
+      const text = ta.value.trim(); if (text.length < 5) { msg.textContent = 'Напишіть хоча б одне речення.'; ta.focus(); return; }
+      bt.disabled = true; msg.textContent = 'Надсилаю…';
+      try {
+        const cur = (await DB.doc('suggestions/' + UID).get()); const data = cur.exists ? cur.data() : { items: [] };
+        const items = (data.items || []).concat([{ id: 's' + Date.now().toString(36), text, cat: cat.value, at: new Date().toISOString() }]);
+        await DB.doc('suggestions/' + UID).set({ name: me.name, dept: me.dept, items });
+        ta.value = ''; msg.textContent = 'Надіслано. Керівники побачать пропозицію в дашборді IT-команд.';
+      } catch (e) { msg.textContent = e && (e.code === 'permission_denied' || e.code === 'not_granted') ? 'Немає прав на запис — попросіть керівника відкрити вам доступ до кабінету.' : 'Не вдалося надіслати. Спробуйте ще раз.'; }
+      finally { bt.disabled = false; }
+    };
+    return p;
+  }
+
+  function chart(days, perDay) {
+    const W = 760, H = 200, P = { l: 30, r: 8, t: 10, b: 26 }; const n = Math.max(1, days.length);
+    const hs = days.map((d) => d.h).sort((a, b) => a - b); const p95 = hs.length ? hs[Math.floor(hs.length * 0.95)] : 8; const max = Math.max(8, perDay * 1.5, Math.min(hs[hs.length - 1] || 0, p95 * 1.3)); const bw = (W - P.l - P.r) / n;
+    const y = (v) => P.t + (H - P.t - P.b) * (1 - v / max); const NS = 'http://www.w3.org/2000/svg';
+    const s = document.createElementNS(NS, 'svg'); s.setAttribute('viewBox', `0 0 ${W} ${H}`); s.setAttribute('role', 'img'); s.setAttribute('aria-label', 'Години по днях');
+    const mk = (t, a) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); s.append(e); return e; };
+    [0, 4, 8, 12].filter((v) => v <= max).forEach((v) => { mk('line', { x1: P.l, x2: W - P.r, y1: y(v), y2: y(v), stroke: 'var(--line)', 'stroke-width': 1 }); mk('text', { x: P.l - 6, y: y(v) + 4, 'text-anchor': 'end' }).textContent = v; });
+    days.forEach((d, i) => { const wd = new Date(d.d + 'T00:00:00').getDay(); const hh = Math.max(0, d.h);
+      const hc = Math.min(hh, max); const r = mk('rect', { x: P.l + i * bw + 2, y: y(hc), width: Math.max(2, bw - 4), height: Math.max(0, y(0) - y(hc)), rx: 3, fill: (wd === 0 || wd === 6) ? 'var(--muted)' : 'var(--accent)', opacity: (wd === 0 || wd === 6) ? .45 : .9 });
+      const tt = document.createElementNS(NS, 'title'); tt.textContent = fmtD(d.d) + ': ' + h1(d.h) + ' год'; r.append(tt);
+      if (i % Math.ceil(n / 10) === 0 || i === n - 1) mk('text', { x: P.l + i * bw + bw / 2, y: H - 8, 'text-anchor': 'middle' }).textContent = fmtD(d.d); });
+    if (perDay) { mk('line', { x1: P.l, x2: W - P.r, y1: y(perDay), y2: y(perDay), stroke: 'var(--ok)', 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }); }
+    const w = el('div');
+    if (perDay) { const lg = el('div'); lg.style.cssText = 'display:flex;gap:16px;justify-content:flex-end;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:0 0 6px'; lg.innerHTML = '<span><span style="display:inline-block;width:18px;border-top:2px dashed var(--ok);vertical-align:middle;margin-right:6px"></span>норма на день ≈ ' + h1(perDay) + ' год</span><span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--muted);opacity:.45;vertical-align:middle;margin-right:6px"></span>вихідні</span>'; w.append(lg); }
+    w.append(s); return w;
+  }
+})();
+</script>
