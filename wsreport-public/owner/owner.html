@@ -797,7 +797,12 @@ const nbHot = () => (S.notes || []).filter((n) => !n.done && n.due && n.due <= t
 function nbSave(id, patch) {
   if (!S.nbCol) return Promise.resolve();
   const ref = S.nbCol.doc(id);
-  return (patch === null ? ref.delete() : ref.set(patch, {merge: true})).catch(() => toast('Не вдалося зберегти — перевірте з’єднання'));
+  if (patch === null) return ref.delete().catch(() => toast('Не вдалося видалити — перевірте з’єднання'));
+  // set() у сховищі замінює документ повністю, тому завжди пишемо задачу цілком
+  const n = (S.notes || []).find((x) => x.id === id) || {};
+  const doc = {text: n.text || '', prio: n.prio || 'mid', due: n.due || null, done: !!n.done, at: n.at || new Date().toISOString(), doneAt: n.doneAt || null, comments: Array.isArray(n.comments) ? n.comments : []};
+  Object.assign(doc, patch);
+  return ref.set(doc).catch(() => toast('Не вдалося зберегти — перевірте з’єднання'));
 }
 function notesPage(pg) {
   const head = el('div', 'mt-head'); const l = el('div');
@@ -844,8 +849,8 @@ function nbItem(n) {
   const it = el('div', 'nb-it p-' + (n.prio || 'mid') + (n.done ? ' done' : '')); it.dataset.id = n.id;
   const cb = el('input'); cb.type = 'checkbox'; cb.checked = !!n.done; cb.setAttribute('aria-label', 'Виконано');
   cb.onchange = () => { n.done = cb.checked; n.doneAt = cb.checked ? new Date().toISOString() : null; nbSave(n.id, {done: n.done, doneAt: n.doneAt}); nbPaint(); if (cb.checked) toast('Виконано ✓'); };
-  const tx = el('div', 'nb-tx', n.text); tx.title = 'Клік — редагувати';
-  tx.onclick = () => { const ed = el('input', 'nb-ed'); ed.type = 'text'; ed.value = n.text; ed.maxLength = 500; tx.replaceWith(ed); ed.focus();
+  const tx = el('div', 'nb-tx', n.text || '⚠ Текст задачі не зберігся — натисніть, щоб вписати його знову'); tx.title = 'Клік — редагувати'; if (!n.text) tx.style.color = 'var(--bad)';
+  tx.onclick = () => { const ed = el('input', 'nb-ed'); ed.type = 'text'; ed.value = n.text || ''; ed.maxLength = 500; tx.replaceWith(ed); ed.focus();
     let fin = false; const end = (save) => { if (fin) return; fin = true; const v = ed.value.trim(); if (save && v && v !== n.text) { n.text = v; nbSave(n.id, {text: v}); } nbPaint(); };
     ed.onkeydown = (e) => { if (e.key === 'Enter') end(true); else if (e.key === 'Escape') end(false); }; ed.onblur = () => end(true); };
   const x = el('button', 'nb-x', '×'); x.type = 'button'; x.title = 'Видалити'; x.setAttribute('aria-label', 'Видалити задачу');
@@ -926,7 +931,7 @@ async function load(meta) {
     db.collection('eng').onSnapshot((q) => { S.eng = q.docs.map((d) => Object.assign({date: d.id}, d.data())); draw(); }, () => {});
     (async () => { try { const u = await cl.use('user'); const id = u && u.id ? await u.id() : null; if (!id) { S.notes = []; draw(); return; }
       S.nbCol = db.collection('data/users/' + id);
-      S.nbCol.onSnapshot((q) => { S.notes = q.docs.filter((d) => d.id.startsWith('n')).map((d) => Object.assign({id: d.id}, d.data())).filter((n) => typeof n.text === 'string'); if (S.tab === 'nb' && document.getElementById('nb-list') && !document.querySelector('.nb-ed')) nbPaint(); else if (S.tab !== 'nb' || !document.getElementById('nb-list')) draw(); }, () => { S.notes = []; draw(); });
+      S.nbCol.onSnapshot((q) => { S.notes = q.docs.filter((d) => d.id.startsWith('n')).map((d) => Object.assign({id: d.id}, d.data())).map((n) => Object.assign(n, {text: typeof n.text === 'string' && n.text ? n.text : '', lost: !(typeof n.text === 'string' && n.text)})); if (S.tab === 'nb' && document.getElementById('nb-list') && !document.querySelector('.nb-ed')) nbPaint(); else if (S.tab !== 'nb' || !document.getElementById('nb-list')) draw(); }, () => { S.notes = []; draw(); });
     } catch (e) { S.notes = []; draw(); } })();
     db.collection('marks').onSnapshot((q) => { const m = {}; q.docs.forEach((d) => { m[d.id] = d.data(); }); S.marks = m; draw(); }, () => {});
   } catch (e) { S.err = 'Помилка завантаження: ' + (e && e.message || e); draw(); }
