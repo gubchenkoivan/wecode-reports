@@ -179,6 +179,12 @@ td a{color:var(--ink);text-decoration-color:var(--line);text-underline-offset:3p
 .nb-bar .seg button[aria-pressed=true]{background:var(--ink);color:var(--panel);font-weight:600}
 .nb-it .nb-ed{width:100%;padding:6px 8px;border:1px solid var(--acc);border-radius:8px;background:var(--soft)}
 .nb-due{font-weight:600}
+.nb-cm{grid-column:2/-1;display:grid;gap:4px;margin-top:2px}
+.nb-c{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:baseline;background:var(--soft);border-radius:8px;padding:5px 9px;font-size:12.5px}
+.nb-cd{color:var(--faint);font-size:11.5px;white-space:nowrap}.nb-ct{overflow-wrap:anywhere;white-space:pre-wrap}
+.nb-cx{border:0;background:none;color:var(--faint);cursor:pointer;font-size:14px;line-height:1;padding:0}.nb-cx:hover{color:var(--bad)}
+.nb-cadd{justify-self:start;border:0;background:none;color:var(--acc);cursor:pointer;font-size:12.5px;padding:2px 0}.nb-cadd:hover{text-decoration:underline}
+
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:13px;z-index:9}
 </style>
 <div class="wrap">
@@ -775,7 +781,7 @@ function howPage(pg) {
    ['Хвости', 'Вкладка «Хвости»: помісячно за місяцем створення, по проєктах і рух за місяць — скільки закрили, скільки додалось нових.'],
    ['Залученість', 'Індекс 0–100 за щоденною статистикою. Кожен робочий день оцінюється за тим, що реально зрушило, з вагою за впливом на гроші: оплата (переведення в PAID\\CLOSE) 40%, DONE-хвости 20%, прострочки 20%, приймання клієнтом 10%, порядок у задачах (без етапу, PAUSE, без типу оплати, без оцінки) 10%. Регулярні прострочки, що не зменшуються, дають 0, зростання — штраф. У комерції: оплата 50, DONE 25, приймання 15, порядок 10. Щоденні знімки зберігаються з 04.11.2026.'],
    ['Пресейли', 'Усі задачі проєкту ADM_Пресейл. Результат «Виграли / Програли / Ще вирішується» ставите ви або Свідрук Наталя; відсоток виграних = виграні ÷ (виграні + програні). Контроль пресейлу — постійна 5-та задача Свідрук Наталі на кожній нараді.'],
-   ['Мої задачі', 'Особистий блокнот власника: задачі собі з важливістю (Важливо / Середньо / Низько) і необов’язковим крайнім строком. Відмітка — виконано, клік по тексту — редагувати, × — видалити. Записи зберігаються в особистому розділі: їх бачите лише ви, навіть якщо дашборд відкриють інші. Цифра на вкладці — задачі на сьогодні та прострочені.'],
+   ['Мої задачі', 'Особистий блокнот власника: задачі собі з важливістю (Важливо / Середньо / Низько) і необов’язковим крайнім строком. Відмітка — виконано, клік по тексту — редагувати, × — видалити. До кожної задачі можна додавати коментарі з датою — на чому зупинились, що заважає закрити. Записи зберігаються в особистому розділі: їх бачите лише ви, навіть якщо дашборд відкриють інші. Цифра на вкладці — задачі на сьогодні та прострочені.'],
    ['Оновлення', 'Щоночі о 02:00 з Worksection і дашборду менеджерів.']].forEach(([a, b]) => { dl.append(el('dt', null, a), el('dd', null, b)); });
   c.append(dl); pg.append(c);
 }
@@ -812,7 +818,7 @@ function notesPage(pg) {
     S.notes = (S.notes || []).concat([Object.assign({id}, doc)]); S.nbD = {text: '', prio: pr.value, due: ''};
     tx.value = ''; du.value = ''; ad.disabled = true; nbSave(id, doc); nbPaint(); tx.focus(); };
   f.append(tx, pr, du, ad); card.append(f);
-  card.append(el('p', 'note', 'Enter — додати. Клік по тексту — редагувати. Строк можна не ставити.'));
+  card.append(el('p', 'note', 'Enter — додати. Клік по тексту — редагувати. Строк можна не ставити. До задачі можна дописувати коментарі.'));
   pg.append(card);
   // фільтри
   const bar = el('div', 'nb-bar');
@@ -852,7 +858,18 @@ function nbItem(n) {
   const di = el('input'); di.type = 'date'; di.value = n.due || ''; di.setAttribute('aria-label', 'Крайній строк'); di.title = 'Змінити або прибрати строк';
   di.onchange = () => { n.due = di.value || null; nbSave(n.id, {due: n.due}); nbPaint(); };
   meta.append(ps, dlab, di, el('span', null, n.done && n.doneAt ? 'виконано ' + dd(n.doneAt.slice(0, 10)) : 'записано ' + dd((n.at || '').slice(0, 10))));
-  it.append(cb, tx, x, meta); return it;
+  const cm = el('div', 'nb-cm'); const cms = Array.isArray(n.comments) ? n.comments : [];
+  cms.forEach((c, i) => { const r = el('div', 'nb-c'); r.append(el('span', 'nb-cd', dd(String(c.at || '').slice(0, 10))), el('span', 'nb-ct', c.text));
+    const dx = el('button', 'nb-cx', '×'); dx.type = 'button'; dx.title = 'Видалити коментар'; dx.setAttribute('aria-label', 'Видалити коментар');
+    dx.onclick = () => { n.comments = cms.filter((_, j) => j !== i); nbSave(n.id, {comments: n.comments}); nbPaint(); };
+    r.append(dx); cm.append(r); });
+  const ab = el('button', 'nb-cadd', cms.length ? '+ коментар' : '💬 Додати коментар'); ab.type = 'button';
+  ab.onclick = () => { const ed = el('input', 'nb-ed'); ed.type = 'text'; ed.maxLength = 1000; ed.placeholder = 'Що заважає, що далі, на чому зупинились… Enter — зберегти, Esc — скасувати'; ab.replaceWith(ed); ed.focus();
+    let fin = false; const end = (save) => { if (fin) return; fin = true; const v = ed.value.trim();
+      if (save && v) { n.comments = cms.concat([{at: new Date().toISOString(), text: v}]); nbSave(n.id, {comments: n.comments}); } nbPaint(); };
+    ed.onkeydown = (e) => { if (e.key === 'Enter') end(true); else if (e.key === 'Escape') end(false); }; ed.onblur = () => end(true); };
+  cm.append(ab);
+  it.append(cb, tx, x, meta, cm); return it;
 }
 function nbPaint() {
   const list = document.getElementById('nb-list'); if (!list) return;
