@@ -156,6 +156,29 @@ td a{color:var(--ink);text-decoration-color:var(--line);text-underline-offset:3p
 .asg input{margin:0}
 .asg.on{border-color:var(--acc);color:var(--acc);font-weight:600;background:var(--accbg)}
 .notein{margin-left:32px;width:calc(100% - 32px);border:1px solid var(--line);border-radius:9px;background:var(--soft);padding:7px 9px;font-size:12.5px;resize:vertical;min-height:34px}
+/* блокнот */
+.nb-form{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:8px;align-items:center}
+.nb-form input[type=text]{padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--soft);min-width:0}
+.nb-form input[type=date]{padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+.nb-add{border:0;background:var(--ink);color:var(--panel);border-radius:9px;padding:8px 16px;font-weight:600;cursor:pointer}
+.nb-add:disabled{opacity:.4;cursor:default}
+@media (max-width:700px){.nb-form{grid-template-columns:1fr 1fr}.nb-form input[type=text]{grid-column:1/-1}.nb-add{grid-column:1/-1}}
+.nb-bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}
+.nb-grp{display:grid;gap:6px}
+.nb-grp h3{display:flex;gap:8px;align-items:center;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.nb-it{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 12px;align-items:start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);border-left:4px solid var(--ref)}
+.nb-it.p-high{border-left-color:var(--bad)}.nb-it.p-mid{border-left-color:var(--warn)}.nb-it.p-low{border-left-color:var(--ref)}
+.nb-it input[type=checkbox]{width:18px;height:18px;margin:2px 0 0;accent-color:var(--ok);cursor:pointer}
+.nb-it .nb-tx{font-size:14px;overflow-wrap:anywhere;cursor:text;white-space:pre-wrap}
+.nb-it.done .nb-tx{text-decoration:line-through;color:var(--faint)}
+.nb-it .nb-meta{grid-column:2;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:12px;color:var(--muted)}
+.nb-it .nb-meta select,.nb-it .nb-meta input[type=date]{padding:2px 6px;font-size:12px;border-radius:7px;border:1px solid var(--line);background:var(--panel)}
+.nb-it .nb-x{border:0;background:none;color:var(--faint);cursor:pointer;font-size:18px;line-height:1;padding:0 2px}
+.nb-it .nb-x:hover{color:var(--bad)}
+.nb-it .nb-x.arm{font-size:12px;font-weight:600;color:#fff;background:var(--bad);border-radius:7px;padding:3px 8px}
+.nb-bar .seg button[aria-pressed=true]{background:var(--ink);color:var(--panel);font-weight:600}
+.nb-it .nb-ed{width:100%;padding:6px 8px;border:1px solid var(--acc);border-radius:8px;background:var(--soft)}
+.nb-due{font-weight:600}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:13px;z-index:9}
 </style>
 <div class="wrap">
@@ -170,6 +193,7 @@ td a{color:var(--ink);text-decoration-color:var(--line);text-underline-offset:3p
       <button class="tab" role="tab" data-t="en" id="tab-en">Залученість</button>
       <button class="tab" role="tab" data-t="ps" id="tab-ps">Пресейли</button>
       <button class="tab" role="tab" data-t="mt" id="tab-mt">Наради й задачі</button>
+      <button class="tab" role="tab" data-t="nb" id="tab-nb">Мої задачі</button>
       <button class="tab" role="tab" data-t="how" id="tab-how">Інструкція</button>
     </nav>
   </header>
@@ -177,9 +201,9 @@ td a{color:var(--ink);text-decoration-color:var(--line);text-underline-offset:3p
 </div>
 <script>
 (() => {
-const S = {pre: {}, tab: 'ov', month: '', L: [], M: [], G: [], A: null, meetings: [], marks: {}, mt: '', db: null, me: null, err: ''};
+const S = {pre: {}, tab: 'ov', month: '', L: [], M: [], G: [], A: null, meetings: [], marks: {}, mt: '', notes: null, nbF: 'open', nbP: '', nbD: {text: '', prio: 'mid', due: ''}, db: null, me: null, err: ''};
 try { const t = localStorage.getItem('ow_tab'); if (t) S.tab = t; } catch (e) {}
-if (['ov', 'tl', 'en', 'ps', 'mt', 'how'].includes(location.hash.slice(1))) S.tab = location.hash.slice(1);
+if (['ov', 'tl', 'en', 'ps', 'mt', 'nb', 'how'].includes(location.hash.slice(1))) S.tab = location.hash.slice(1);
 const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
 const nf = new Intl.NumberFormat('uk-UA', {maximumFractionDigits: 0});
 const N = (v) => v == null ? '—' : nf.format(v), H = (v) => v == null ? '—' : nf.format(v) + ' год', P = (v) => v == null ? '—' : v + '%';
@@ -751,8 +775,99 @@ function howPage(pg) {
    ['Хвости', 'Вкладка «Хвости»: помісячно за місяцем створення, по проєктах і рух за місяць — скільки закрили, скільки додалось нових.'],
    ['Залученість', 'Індекс 0–100 за щоденною статистикою. Кожен робочий день оцінюється за тим, що реально зрушило, з вагою за впливом на гроші: оплата (переведення в PAID\\CLOSE) 40%, DONE-хвости 20%, прострочки 20%, приймання клієнтом 10%, порядок у задачах (без етапу, PAUSE, без типу оплати, без оцінки) 10%. Регулярні прострочки, що не зменшуються, дають 0, зростання — штраф. У комерції: оплата 50, DONE 25, приймання 15, порядок 10. Щоденні знімки зберігаються з 04.11.2026.'],
    ['Пресейли', 'Усі задачі проєкту ADM_Пресейл. Результат «Виграли / Програли / Ще вирішується» ставите ви або Свідрук Наталя; відсоток виграних = виграні ÷ (виграні + програні). Контроль пресейлу — постійна 5-та задача Свідрук Наталі на кожній нараді.'],
+   ['Мої задачі', 'Особистий блокнот власника: задачі собі з важливістю (Важливо / Середньо / Низько) і необов’язковим крайнім строком. Відмітка — виконано, клік по тексту — редагувати, × — видалити. Записи зберігаються в особистому розділі: їх бачите лише ви, навіть якщо дашборд відкриють інші. Цифра на вкладці — задачі на сьогодні та прострочені.'],
    ['Оновлення', 'Щоночі о 02:00 з Worksection і дашборду менеджерів.']].forEach(([a, b]) => { dl.append(el('dt', null, a), el('dd', null, b)); });
   c.append(dl); pg.append(c);
+}
+
+
+/* ---------- мої задачі (особистий блокнот) ---------- */
+// Зберігаються в особистому розділі data/users/<id>/ — бачить лише той, хто їх записав.
+const PRI = [['high', 'Важливо', 'bad'], ['mid', 'Середньо', 'warn'], ['low', 'Низько', 'mut']];
+const PRL = Object.fromEntries(PRI.map(([k, l]) => [k, l])), PRC = Object.fromEntries(PRI.map(([k, , c]) => [k, c]));
+const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const dayDiff = (d) => Math.round((new Date(d + 'T00:00:00') - new Date(today() + 'T00:00:00')) / 864e5);
+const nbHot = () => (S.notes || []).filter((n) => !n.done && n.due && n.due <= today()).length;
+function nbSave(id, patch) {
+  if (!S.nbCol) return Promise.resolve();
+  const ref = S.nbCol.doc(id);
+  return (patch === null ? ref.delete() : ref.set(patch, {merge: true})).catch(() => toast('Не вдалося зберегти — перевірте з’єднання'));
+}
+function notesPage(pg) {
+  const head = el('div', 'mt-head'); const l = el('div');
+  l.append(el('h2', null, 'Мої задачі'), el('p', 'note', 'Особистий блокнот: записуйте задачі собі, ставте важливість і, якщо треба, крайній строк. Записи бачите лише ви.'));
+  head.append(l); pg.append(head);
+  if (!S.nbCol) { pg.append(el('div', 'banner', S.notes === null && S.db ? 'Завантаження задач…' : 'Блокнот доступний, коли дашборд відкрито з вашого акаунта claude.ai.')); return; }
+  // форма
+  const card = el('div', 'card');
+  const f = el('form', 'nb-form'); f.setAttribute('aria-label', 'Нова задача');
+  const tx = el('input'); tx.type = 'text'; tx.id = 'nb-text'; tx.placeholder = 'Що потрібно зробити?'; tx.maxLength = 500; tx.value = S.nbD.text; tx.setAttribute('aria-label', 'Текст задачі');
+  const pr = el('select'); pr.id = 'nb-prio'; pr.setAttribute('aria-label', 'Важливість'); PRI.forEach(([k, lb]) => pr.append(new Option(lb, k))); pr.value = S.nbD.prio;
+  const du = el('input'); du.type = 'date'; du.id = 'nb-due'; du.value = S.nbD.due; du.title = 'Крайній строк (необов’язково)'; du.setAttribute('aria-label', 'Крайній строк, необов’язково');
+  const ad = el('button', 'nb-add', 'Додати'); ad.type = 'submit'; ad.disabled = !S.nbD.text.trim();
+  tx.oninput = () => { S.nbD.text = tx.value; ad.disabled = !tx.value.trim(); }; pr.onchange = () => { S.nbD.prio = pr.value; }; du.onchange = () => { S.nbD.due = du.value; };
+  f.onsubmit = (e) => { e.preventDefault(); const t = tx.value.trim(); if (!t) return;
+    const id = 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const doc = {text: t, prio: pr.value, due: du.value || null, done: false, at: new Date().toISOString(), doneAt: null};
+    S.notes = (S.notes || []).concat([Object.assign({id}, doc)]); S.nbD = {text: '', prio: pr.value, due: ''};
+    tx.value = ''; du.value = ''; ad.disabled = true; nbSave(id, doc); nbPaint(); tx.focus(); };
+  f.append(tx, pr, du, ad); card.append(f);
+  card.append(el('p', 'note', 'Enter — додати. Клік по тексту — редагувати. Строк можна не ставити.'));
+  pg.append(card);
+  // фільтри
+  const bar = el('div', 'nb-bar');
+  const seg = el('div', 'seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Показати');
+  [['open', 'Активні'], ['done', 'Виконані'], ['all', 'Усі']].forEach(([k, lb]) => { const b = el('button', null, lb); b.type = 'button'; b.dataset.f = k; b.setAttribute('aria-pressed', S.nbF === k); b.onclick = () => { S.nbF = k; draw(); }; seg.append(b); });
+  const seg2 = el('div', 'seg'); seg2.setAttribute('role', 'group'); seg2.setAttribute('aria-label', 'Важливість');
+  [['', 'Будь-яка']].concat(PRI.map(([k, lb]) => [k, lb])).forEach(([k, lb]) => { const b = el('button', null, lb); b.type = 'button'; b.setAttribute('aria-pressed', S.nbP === k); b.onclick = () => { S.nbP = k; draw(); }; seg2.append(b); });
+  const cnt = el('span', 'note'); cnt.id = 'nb-cnt';
+  const fl = el('div', 'acts'); fl.style.paddingLeft = '0'; fl.append(seg, seg2);
+  bar.append(fl, cnt); pg.append(bar);
+  const list = el('div', 'mrows'); list.id = 'nb-list'; pg.append(list);
+  nbPaint();
+}
+function dueLabel(n) {
+  if (!n.due) return null; const d = dayDiff(n.due);
+  if (n.done) return ['до ' + dd(n.due), 'mut'];
+  if (d < 0) return ['прострочено на ' + (-d) + ' дн. · ' + dd(n.due), 'bad'];
+  if (d === 0) return ['сьогодні', 'warn'];
+  if (d === 1) return ['завтра', 'warn'];
+  return ['до ' + dd(n.due) + ' · ' + d + ' дн.', ''];
+}
+function nbItem(n) {
+  const it = el('div', 'nb-it p-' + (n.prio || 'mid') + (n.done ? ' done' : '')); it.dataset.id = n.id;
+  const cb = el('input'); cb.type = 'checkbox'; cb.checked = !!n.done; cb.setAttribute('aria-label', 'Виконано');
+  cb.onchange = () => { n.done = cb.checked; n.doneAt = cb.checked ? new Date().toISOString() : null; nbSave(n.id, {done: n.done, doneAt: n.doneAt}); nbPaint(); if (cb.checked) toast('Виконано ✓'); };
+  const tx = el('div', 'nb-tx', n.text); tx.title = 'Клік — редагувати';
+  tx.onclick = () => { const ed = el('input', 'nb-ed'); ed.type = 'text'; ed.value = n.text; ed.maxLength = 500; tx.replaceWith(ed); ed.focus();
+    let fin = false; const end = (save) => { if (fin) return; fin = true; const v = ed.value.trim(); if (save && v && v !== n.text) { n.text = v; nbSave(n.id, {text: v}); } nbPaint(); };
+    ed.onkeydown = (e) => { if (e.key === 'Enter') end(true); else if (e.key === 'Escape') end(false); }; ed.onblur = () => end(true); };
+  const x = el('button', 'nb-x', '×'); x.type = 'button'; x.title = 'Видалити'; x.setAttribute('aria-label', 'Видалити задачу');
+  x.onclick = () => { if (!x.classList.contains('arm')) { x.classList.add('arm'); x.textContent = 'Видалити?'; setTimeout(() => { if (x.isConnected) { x.classList.remove('arm'); x.textContent = '×'; } }, 3000); return; }
+    S.notes = S.notes.filter((y) => y.id !== n.id); nbSave(n.id, null); nbPaint(); toast('Задачу видалено'); };
+  const meta = el('div', 'nb-meta');
+  const ps = el('select'); ps.setAttribute('aria-label', 'Важливість'); PRI.forEach(([k, lb]) => ps.append(new Option(lb, k))); ps.value = n.prio || 'mid';
+  ps.onchange = () => { n.prio = ps.value; nbSave(n.id, {prio: n.prio}); nbPaint(); };
+  const dl = dueLabel(n); const dlab = el('span', 'nb-due ' + (dl ? dl[1] : 'mut'), dl ? dl[0] : 'без строку');
+  const di = el('input'); di.type = 'date'; di.value = n.due || ''; di.setAttribute('aria-label', 'Крайній строк'); di.title = 'Змінити або прибрати строк';
+  di.onchange = () => { n.due = di.value || null; nbSave(n.id, {due: n.due}); nbPaint(); };
+  meta.append(ps, dlab, di, el('span', null, n.done && n.doneAt ? 'виконано ' + dd(n.doneAt.slice(0, 10)) : 'записано ' + dd((n.at || '').slice(0, 10))));
+  it.append(cb, tx, x, meta); return it;
+}
+function nbPaint() {
+  const list = document.getElementById('nb-list'); if (!list) return;
+  const all = S.notes || []; const open = all.filter((n) => !n.done).length;
+  const tb = document.getElementById('tab-nb'); tb.querySelectorAll('.badge').forEach((b) => b.remove()); if (nbHot()) { const b = el('span', 'badge', String(nbHot())); b.title = 'Мої задачі на сьогодні або прострочені'; tb.append(b); }
+  const cnt = document.getElementById('nb-cnt'); if (cnt) cnt.textContent = 'Активних ' + open + ' · виконаних ' + (all.length - open) + (nbHot() ? ' · на сьогодні й прострочено ' + nbHot() : '');
+  let rs = all.filter((n) => (S.nbF === 'all' || (S.nbF === 'done' ? n.done : !n.done)) && (!S.nbP || n.prio === S.nbP));
+  const pi = (k) => ({high: 0, mid: 1, low: 2}[k] ?? 1);
+  rs.sort((a, b) => S.nbF === 'done' ? String(b.doneAt || '').localeCompare(String(a.doneAt || '')) : (a.done - b.done) || (a.due ? 0 : 1) - (b.due ? 0 : 1) || String(a.due || '').localeCompare(String(b.due || '')) || String(a.at).localeCompare(String(b.at)));
+  list.replaceChildren();
+  if (!rs.length) { list.append(el('p', 'muted', !all.length ? 'Поки що задач немає. Запишіть першу вгорі.' : S.nbF === 'done' ? 'Виконаних задач тут ще немає.' : 'Тут порожньо — усе зроблено 🎉')); return; }
+  if (S.nbF === 'done') { const g = el('div', 'nb-grp'); rs.forEach((n) => g.append(nbItem(n))); list.append(g); return; }
+  PRI.forEach(([k, lb, c]) => { const its = rs.filter((n) => pi(n.prio) === pi(k)); if (!its.length) return;
+    const g = el('section', 'nb-grp'); const h = el('h3'); h.append(el('span', 'pill ' + c, lb), el('span', null, its.filter((n) => !n.done).length + ' активн.')); g.append(h);
+    its.forEach((n) => g.append(nbItem(n))); list.append(g); });
 }
 
 /* ---------- каркас ---------- */
@@ -763,6 +878,8 @@ function draw() {
   document.querySelectorAll('.tab').forEach((b) => { b.setAttribute('aria-selected', b.dataset.t === S.tab); b.querySelectorAll('.badge').forEach((x) => x.remove()); });
   const mtTab = document.getElementById('tab-mt'); const prevOpen = S.meetings.reduce((a, mt) => a + (mt.items || []).filter((it) => { const k = markOf(mt.date, it.id); return k.assigned && !k.status; }).length, 0);
   if (prevOpen) { const b = el('span', 'badge', String(prevOpen)); b.title = 'Поставлені задачі без результату'; mtTab.append(b); }
+  const nbH = nbHot(); if (nbH) { const b = el('span', 'badge', String(nbH)); b.title = 'Мої задачі на сьогодні або прострочені'; document.getElementById('tab-nb').append(b); }
+  if (S.tab === 'nb') { notesPage(pg); return; }
   if (S.err) { pg.append(el('div', 'banner', S.err)); }
   if (!S.L.length) { if (!S.err) pg.append(el('p', 'muted', 'Завантаження даних…')); return; }
   if (S.tab === 'mt') meetingsPage(pg); else if (S.tab === 'tl') tailsPage(pg); else if (S.tab === 'en') engPage(pg); else if (S.tab === 'ps') presalePage(pg); else if (S.tab === 'how') howPage(pg); else overview(pg);
@@ -790,6 +907,10 @@ async function load(meta) {
     db.collection('meetings').onSnapshot((q) => { S.meetings = q.docs.map((d) => Object.assign({date: d.id}, d.data())); draw(); }, () => {});
     db.collection('presale').onSnapshot((q) => { const m = {}; q.docs.forEach((d) => { m[d.id] = d.data(); }); S.pre = m; draw(); }, () => {});
     db.collection('eng').onSnapshot((q) => { S.eng = q.docs.map((d) => Object.assign({date: d.id}, d.data())); draw(); }, () => {});
+    (async () => { try { const u = await cl.use('user'); const id = u && u.id ? await u.id() : null; if (!id) { S.notes = []; draw(); return; }
+      S.nbCol = db.collection('data/users/' + id);
+      S.nbCol.onSnapshot((q) => { S.notes = q.docs.filter((d) => d.id.startsWith('n')).map((d) => Object.assign({id: d.id}, d.data())).filter((n) => typeof n.text === 'string'); if (S.tab === 'nb' && document.getElementById('nb-list') && !document.querySelector('.nb-ed')) nbPaint(); else if (S.tab !== 'nb' || !document.getElementById('nb-list')) draw(); }, () => { S.notes = []; draw(); });
+    } catch (e) { S.notes = []; draw(); } })();
     db.collection('marks').onSnapshot((q) => { const m = {}; q.docs.forEach((d) => { m[d.id] = d.data(); }); S.marks = m; draw(); }, () => {});
   } catch (e) { S.err = 'Помилка завантаження: ' + (e && e.message || e); draw(); }
 })();
