@@ -1,0 +1,81 @@
+name: wspay
+
+# We.Bit · облік задач для розрахунку ЗП (wspay.py), етап 1 — лише читання Worksection.
+# Щодня о 03:40 за Києвом: знімок задач у PAID\CLOSE, історія переходів, сигнали про ріст годин і повернення в роботу.
+# Ручний запуск з mode=calc — ще й чернетка нарахування годин на людину.
+# Репозиторій публічний: у лог потрапляють лише кількості, дані зберігаються зашифрованими в pay.enc.
+on:
+  schedule:
+    # GitHub знає лише UTC: 01:40 UTC = 03:40 узимку (UTC+2), 00:40 UTC = 03:40 улітку (UTC+3); зайвий пропускається.
+    - cron: "40 1 * * *"
+    - cron: "40 0 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "snapshot — знімок; calc — знімок + чернетка нарахування"
+        required: false
+        default: "snapshot"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wsreport
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: wsreport-public
+    env:
+      TZ: Europe/Kyiv
+      WS_API_KEY: ${{ secrets.WS_API_KEY }}
+      DASH_PASS: ${{ secrets.DASH_PASS }}
+      PAY_MODE: ${{ inputs.mode || 'snapshot' }}
+    steps:
+      - name: Лише 03:40 за Києвом (зимовий/літній час)
+        id: gate
+        working-directory: .
+        run: |
+          OFF=$(TZ=Europe/Kyiv date +%z)
+          RUN=yes
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "${{ github.event.schedule }}" = "40 1 * * *" ] && [ "$OFF" != "+0200" ]; then RUN=no; fi
+            if [ "${{ github.event.schedule }}" = "40 0 * * *" ] && [ "$OFF" != "+0300" ]; then RUN=no; fi
+          fi
+          echo "Київ UTC$OFF, запуск: $RUN"
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'yes'
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.run == 'yes'
+        with:
+          python-version: "3.12"
+      - name: Розшифрувати налаштування й історію
+        if: steps.gate.outputs.run == 'yes'
+        run: |
+          test -n "$DASH_PASS" || { echo "Немає секрету DASH_PASS"; exit 1; }
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:DASH_PASS -in state.enc | tar xzf - --no-same-permissions config.json
+          if [ -f pay.enc ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:DASH_PASS -in pay.enc | tar xzf - --no-same-permissions
+          fi
+      - name: Знімок задач PAID\CLOSE
+        if: steps.gate.outputs.run == 'yes'
+        run: python wspay.py
+      - name: Зашифрувати й зберегти
+        if: always() && steps.gate.outputs.run == 'yes'
+        run: |
+          if [ -f output/pay/tasks_state.json ]; then
+            tar czf - output/pay | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:DASH_PASS -out pay.enc
+          fi
+          rm -rf output config.json
+          git config user.name "wsreport-bot"
+          git config user.email "wsreport-bot@users.noreply.github.com"
+          [ -f pay.enc ] && git add pay.enc
+          git diff --cached --quiet && exit 0
+          git commit -m "wspay $(date +%F)"
+          git pull --rebase origin main
+          git push
