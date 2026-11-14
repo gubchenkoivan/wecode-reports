@@ -20,6 +20,7 @@
   --accent:#7b9dff; --accent-fg:#0b1430; --accent-soft:#1c2744;
   --ok:#55c98b; --ok-bg:#15301f; --warn:#e7ae4c; --warn-bg:#33270f; --bad:#f08072; --bad-bg:#3a1a16; color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-ui);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
 .wrap{max-width:1120px;margin:0 auto;display:grid;gap:18px}
 h1{font-size:28px;line-height:1.15;margin:0;font-weight:800;letter-spacing:-.01em;text-wrap:balance}
@@ -185,13 +186,14 @@ footer{font-size:13px;color:var(--muted);text-align:center}
     const st = ST[k.status] || ['', k.status || '']; if (st[1]) who.append(el('span', 'pill ' + st[0], st[1]));
     l.append(who); const out = el('button', null, 'Вийти'); out.onclick = () => { c.hidden = true; c.replaceChildren(); $('login').hidden = false; $('pw').focus(); };
     head.append(l, out); c.append(head);
-    const PG = { ov: el('div', 'pg'), proj: el('div', 'pg'), recs: el('div', 'pg'), p80: el('div', 'pg'), sug: el('div', 'pg'), guide: el('div', 'pg') };
+    const PG = { ov: el('div', 'pg'), proj: el('div', 'pg'), recs: el('div', 'pg'), p80: el('div', 'pg'), close: el('div', 'pg'), sug: el('div', 'pg'), guide: el('div', 'pg') };
     const nav = el('nav', 'tabs'); nav.setAttribute('role', 'tablist');
-    const TABS = [['ov', '📊 Огляд', null], ['proj', '🗂 Мої проєкти', null], ['recs', '💡 Рекомендації', me.recs.filter((r) => r.sec !== 'ok').length], ['p80', '🎯 20/80', me.p80.filter((x) => x.top).length], ['sug', '✉️ Пропозиції', null], ['guide', '📖 Інструкція', null]];
-    let tabCur = 'ov'; try { const t = localStorage.getItem('cab_tab'); if (PG[t]) tabCur = t; } catch (e) {}
+    const TABS = [['ov', '📊 Огляд', null], ['proj', '🗂 Мої проєкти', null], ['recs', '💡 Рекомендації', me.recs.filter((r) => r.sec !== 'ok').length], ['p80', '🎯 20/80', me.p80.filter((x) => x.top).length], ['close', '🧾 Закриття', null], ['sug', '✉️ Пропозиції', null], ['guide', '📖 Інструкція', null]];
+    let tabCur = 'ov'; try { const t = localStorage.getItem('cab_tab'); if (PG[t]) tabCur = t; } catch (e) {} if (window.CAB_PREVIEW_TAB && PG[window.CAB_PREVIEW_TAB]) tabCur = window.CAB_PREVIEW_TAB;
     const showTab = (key) => { tabCur = key; try { localStorage.setItem('cab_tab', key); } catch (e) {} for (const k2 in PG) PG[k2].hidden = k2 !== key; nav.querySelectorAll('button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.k === key))); };
     TABS.forEach(([key, label, n]) => { const b = el('button', 'tab', label); b.type = 'button'; b.dataset.k = key; b.setAttribute('role', 'tab'); if (n) b.append(el('span', 'tbadge', String(n))); b.onclick = () => showTab(key); nav.append(b); });
-    c.append(nav, PG.ov, PG.proj, PG.recs, PG.p80, PG.sug, PG.guide);
+    c.append(nav, PG.ov, PG.proj, PG.recs, PG.p80, PG.close, PG.sug, PG.guide);
+    PG.close.append(closeBox(me));
     PG.proj.append(projBox(me));
     const gd = el('section', 'panel guide'); gd.innerHTML = GUIDE; PG.guide.append(gd);
     // kpis
@@ -284,6 +286,77 @@ footer{font-size:13px;color:var(--muted);text-align:center}
   }
 
   // ---------- 20/80 ----------
+
+  // ---------- закриття місяця (розрахунок ЗП) ----------
+  function closeBox(me) {
+    const wrap = el('div', 'pg'); const L = me.closing || [];
+    if (!L.length) { const p = el('section', 'panel'); p.append(el('h2', null, '🧾 Закриття'), el('p', 'muted', 'Закритих місяців поки немає. Після закриття місяця тут з’явиться ваш розрахунок: години, сальдо, премія і задачі, що потрапили в оплату.')); wrap.append(p); return wrap; }
+    const money = (x) => x == null ? '—' : Number(x).toLocaleString('uk-UA', { maximumFractionDigits: 2 }) + ' грн';
+    const hh = (x) => x == null ? '—' : (Math.round(x * 100) / 100).toLocaleString('uk-UA') + ' год';
+    const sg = (x) => (x > 0 ? '+' : x < 0 ? '−' : '') + (Math.round(Math.abs(x) * 100) / 100).toLocaleString('uk-UA');
+    const PAY = { paid: ['ok', 'Оплачувана'], unpaid: ['warn', 'Не оплачувана'], guarantee: ['', 'Гарантія'], none: ['bad', 'без мітки'] };
+    const mName = (m) => { const [y, mm] = m.split('-').map(Number); return MONTHS[mm - 1] + ' ' + y; };
+    const sel = el('div', 'filters'); const body = el('div', 'pg'); let cur = 0;
+    if (L.length > 1) { L.forEach((x, i) => { const b = el('button', null, mName(x.month)); b.type = 'button'; b.setAttribute('aria-pressed', String(i === cur)); b.onclick = () => { cur = i; sel.querySelectorAll('button').forEach((q) => q.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); draw(); }; sel.append(b); }); wrap.append(sel); }
+    wrap.append(body);
+    function draw() {
+      body.replaceChildren(); const x = L[cur]; const isH = !!x.plan; const isPT = x.type === 'PT'; const isF = x.type === 'F' || isH;
+      const hp = el('section', 'panel'); const t = el('div', 'head'); const l = el('div');
+      l.append(el('h1', null, 'Закриття: ' + mName(x.month)));
+      const w = el('div', 'who'); w.append(el('span', 'pill ' + (x.approved ? 'ok' : 'warn'), x.approved ? 'Затверджено' : 'Чернетка — може змінитися'),
+        el('span', null, 'знімок задач PAID\\CLOSE на ' + fmtD(x.snapshot) + (x.snapshot ? '.' + x.snapshot.slice(0, 4) : '')),
+        el('span', null, isPT ? 'Погодинна оплата' : isH ? 'Керівник напряму' : 'Повна зайнятість'), x.grade ? el('span', 'pill', x.grade) : '');
+      l.append(w); t.append(l); hp.append(t);
+      const ks = el('div', 'kpis'); const tot = (x.paid || 0) + (x.unpaid || 0) + (x.old || 0);
+      kpi(ks, 'Годин у закритті', hh(tot), 'оплачувані ' + h1(x.paid) + ' · неоплачувані ' + h1(x.unpaid) + (x.old ? ' · стара система ' + h1(x.old) : '') + (x.guarantee ? ' · гарантія ' + h1(x.guarantee) + ' (не рахується)' : ''));
+      if (isH) kpi(ks, 'Години відділу', h1(x.dept_hours) + ' / ' + x.plan.hours, 'план відділу на місяць', x.dept_hours >= x.plan.hours ? 'ok' : 'bad', x.dept_hours / x.plan.hours);
+      else if (isF) kpi(ks, 'Норма', hh(x.norm), tot >= x.norm ? 'виконано: +' + h1(tot - x.norm) + ' год понад норму' : 'не вистачило ' + h1(x.norm - tot) + ' год', tot >= x.norm ? 'ok' : 'bad', x.norm ? tot / x.norm : null);
+      if (isF) kpi(ks, isH ? 'Сальдо відділу' : 'Сальдо', sg(x.s0) + ' → ' + sg(x.s1), 'на початок → на кінець місяця, год', x.s1 < 0 ? 'bad' : 'ok');
+      if (isF) kpi(ks, 'Премія', money(x.premium), x.premium ? h1(x.premium_h) + ' год × ' + x.rate + ' грн' : 'премія нараховується, коли сальдо виходить у плюс', x.premium ? 'ok' : '');
+      if (isPT) kpi(ks, 'Погодинна оплата', money(x.hourly), h1((x.paid || 0) + (x.old || 0)) + ' опл. год × ' + x.rate + ' грн');
+      kpi(ks, 'Нараховано', money((x.accrual || 0) + (x.comp || 0)), (isF ? 'оклад ' + money(x.oklad) + (x.premium ? ' + премія' : '') : 'за оплачувані години') + (x.comp ? ' + компенсація ' + money(x.comp) : ''));
+      if (x.card || x.official) kpi(ks, x.to_pay < 0 ? 'До повернення' : 'До виплати', money(Math.abs(x.to_pay)), 'уже виплачено ' + money(x.card) + (x.official ? ' · офіційна частина ' + money(x.official) : '') + (x.return_card ? ' · повернення на картку ' + x.return_card : ''), x.to_pay < 0 ? 'warn' : '');
+      hp.append(ks); body.append(hp);
+      // як рахується
+      if (isF) {
+        const ex = el('section', 'panel'); ex.append(el('h2', null, isH ? 'Як рахується сальдо відділу' : 'Як рахується сальдо'));
+        const f = isH ? sg(x.s0) + ' (на початок) + ' + h1(x.dept_hours) + ' (години відділу) − ' + x.plan.hours + ' (план) = ' + sg(x.s_calc) + ' год'
+          : sg(x.s0) + ' (на початок) + ' + h1(x.paid) + ' (опл.) + ' + h1(x.unpaid) + ' (неопл.)' + (x.old ? ' + ' + h1(x.old) + ' (стара система)' : '') + ' − ' + x.norm + ' (норма) = ' + sg(x.s_calc) + ' год';
+        const fm = el('p', 'note'); fm.style.fontFamily = 'var(--f-mono)'; fm.textContent = f; ex.append(fm);
+        const tips = el('ul', 'sg-how');
+        const li = (s) => tips.append(el('li', null, s));
+        if (x.s_calc > 0) { li('Сальдо вийшло в плюс на ' + h1(x.s_calc) + ' год — за ' + h1(x.premium_h) + ' год нараховано премію ' + money(x.premium) + ' (' + x.rate + ' грн/год). Після премії сальдо обнуляється.'); if (x.s_calc > x.premium_h + 0.01) li('Премія рахується лише за оплачувані години: ' + h1(x.s_calc - x.premium_h) + ' год понад норму набрано неоплачуваними задачами.'); }
+        else {
+          li('Сальдо від’ємне: ' + sg(x.s1) + ' год. Оклад гарантований, премії цього місяця немає.');
+          const d = Math.abs(x.s1); const per = isH ? 50 : 20; li('Щоб вийти в плюс, треба закрити ще ' + h1(d) + ' год понад ' + (isH ? 'план відділу' : 'норму') + '. Наприклад, +' + per + ' год на місяць понад ' + (isH ? 'план' : 'норму') + ' — це приблизно ' + Math.ceil(d / per) + ' міс.');
+          if (!isH && tot < x.norm) li('У цьому місяці до норми не вистачило ' + h1(x.norm - tot) + ' год — тому сальдо зросло в мінус. Найшвидше допомагають задачі, які вже в DONE / TESTING BY CLIENT: доведіть їх до оплати (вкладка 🎯 20/80).');
+          else if (!isH) li('Цього місяця ви закрили більше норми на ' + h1(tot - x.norm) + ' год — мінус зменшився. Так тримати!');
+        }
+        if (x.unpaid) li('Неоплачувані години (' + h1(x.unpaid) + ') рахуються в норму, але премію за них не платять.');
+        ex.append(tips); body.append(ex);
+      }
+      // задачі
+      const tp = el('section', 'panel'); tp.append(el('h2', null, 'Задачі в оплату — Worksection (' + x.tasks.length + ')'));
+      tp.append(el('p', 'muted', 'Задачі на етапі PAID\\CLOSE на дату знімка: ваш час, записаний у кожній з них (записи від 10 хв). Після виплати задачі переводяться в ⛔️Definitively closed.'));
+      const tw = el('div', 'tw'); const tb = el('table'); const th = el('thead'); const hr = el('tr');
+      ['Задача', 'Проєкт', 'Вид оплати', 'Ваші години'].forEach((q) => hr.append(el('th', null, q))); th.append(hr); tb.append(th); const bd = el('tbody');
+      if (!x.tasks.length) { const r = el('tr'); const d = el('td', 'muted', 'Задач у Worksection у цьому закритті немає.'); d.colSpan = 4; r.append(d); bd.append(r); }
+      for (const q of x.tasks) { const r = el('tr'); const a = el('td'); a.append(taskLink(q)); if (q.rep) { a.append(' '); a.append(el('span', 'pill warn', 'збіг з минулою виплатою')); }
+        const pk = PAY[q.pay] || ['', q.pay]; const pc = el('td'); pc.append(el('span', 'pill ' + pk[0], pk[1])); r.append(a, el('td', null, q.p || ''), pc, el('td', 'n', h1(q.h))); bd.append(r); }
+      const sr = el('tr'); const s1 = el('td', null, 'Разом'); s1.colSpan = 3; s1.style.fontWeight = '700'; sr.append(s1, el('td', 'n', h1(x.tasks.reduce((a, q) => a + q.h, 0)))); bd.append(sr);
+      tb.append(bd); tw.append(tb); tp.append(tw); body.append(tp);
+      if (x.old_items && x.old_items.length) {
+        const op = el('section', 'panel'); op.append(el('h2', null, 'Стара система (' + x.old_items.length + ')'));
+        op.append(el('p', 'muted', 'Задачі та протоколи старої системи, які не були закриті в попередніх періодах (порожнє «Узгоджено з клієнтом»). Рахуються як оплачувані.'));
+        const tw2 = el('div', 'tw'); const t2 = el('table'); const h2 = el('thead'); const r2 = el('tr'); ['Контрагент', 'Задача / протокол', 'Год'].forEach((q) => r2.append(el('th', null, q))); h2.append(r2); t2.append(h2);
+        const b2 = el('tbody'); for (const q of x.old_items) { const r = el('tr'); r.append(el('td', null, q.c || ''), el('td', null, q.t), el('td', 'n', h1(q.h))); b2.append(r); }
+        const s2 = el('tr'); const c2 = el('td', null, 'Разом'); c2.colSpan = 2; c2.style.fontWeight = '700'; s2.append(c2, el('td', 'n', h1(x.old))); b2.append(s2);
+        t2.append(b2); tw2.append(t2); op.append(tw2); body.append(op);
+      }
+      body.append(el('p', 'note', 'Якщо бачите помилку в годинах чи задачах — напишіть керівнику до виплати. Якщо задачу з PAID\\CLOSE повернуть у роботу, We.Bit попросить у коментарі пояснення.'));
+    }
+    draw(); return wrap;
+  }
   function p80Box(me) {
     const p = el('section', 'panel'); p.append(el('h2', null, '🎯 20/80 — що довести до оплати першим'));
     const L = me.p80; const tot = L.reduce((s, x) => s + x.h, 0); const top = L.filter((x) => x.top); const topH = top.reduce((s, x) => s + x.h, 0);
@@ -358,6 +431,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
     if (perDay) { const lg = el('div'); lg.style.cssText = 'display:flex;gap:16px;justify-content:flex-end;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:0 0 6px'; lg.innerHTML = '<span><span style="display:inline-block;width:18px;border-top:2px dashed var(--ok);vertical-align:middle;margin-right:6px"></span>норма на день ≈ ' + h1(perDay) + ' год</span><span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--muted);opacity:.45;vertical-align:middle;margin-right:6px"></span>вихідні</span>'; w.append(lg); }
     w.append(s); return w;
   }
+  if (window.CAB_PREVIEW) render(window.CAB_PREVIEW);
 })();
 </script>
 

@@ -177,7 +177,7 @@ def calc(month, tasks, terms, saldo_start, inp, history_names=None):
         "totals": {"accrual": tot("accrual"), "comp": tot("comp"), "total": tot("total"), "card": tot("card"),
                    "official": tot("official"), "fee": tot("fee"), "to_pay": round(sum(r["to_pay"] for r in people if r["to_pay"] > 0), 2),
                    "to_return": round(sum(r["to_pay"] for r in people if r["to_pay"] < 0), 2), "net": tot("to_pay")},
-        "return_card": terms.get("return_card", ""),
+        "return_card": terms.get("return_card", ""), "plans": terms.get("plans") or {},
         "repeats": [dict(x, who=r["name"]) for r in people for x in r["tasks"] if x["rep"]],
         "task_ids": sorted(tasks.keys()),
         "tasks_hours": round(sum(t.get("hours") or 0 for t in tasks.values()), 2),

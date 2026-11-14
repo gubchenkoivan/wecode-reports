@@ -3,6 +3,7 @@
 Кожен запис зашифровано паролем співробітника: PBKDF2-SHA256 (200 000 ітерацій) → AES-256-GCM.
 Відкрито у файлі лише sha256 від логіна, сіль, iv і шифротекст — без пароля дані не прочитати.
 Використання: python build_personal.py <dash_dir> <keys.json> <out.json> [<папка або JSON-файл з проєктами дашборду менеджерів>]
+Вкладка «Закриття»: змінна оточення CLOSING_DIR — папка output/pay/closing (результати wsclose.py).
 keys.json: {"Ім'я Прізвище": {"login": "...", "password": "..."}}
 """
 import base64
@@ -10,6 +11,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
 import sys
 from collections import Counter
 
@@ -193,6 +195,39 @@ def build_one(name, d, month, today):
     }
 
 
+CLOSE_FIELDS = ("type", "grade", "head", "oklad", "norm", "rate", "paid", "unpaid", "guarantee", "old", "s0", "s_calc", "s1",
+                "premium_h", "premium", "hourly", "accrual", "comp", "card", "official", "fee", "via", "to_pay", "dept_hours", "note")
+
+
+def load_closings(cdir):
+    """Закриття місяців (output/pay/closing/YYYY-MM.json з wsclose.py), найновіші першими."""
+    res = []
+    if cdir and os.path.isdir(cdir):
+        for f in sorted(os.listdir(cdir), reverse=True):
+            if re.fullmatch(r"\d{4}-\d{2}\.json", f):
+                res.append(json.load(open(os.path.join(cdir, f), encoding="utf-8")))
+    return res
+
+
+def closing_for(name, closings, limit=6):
+    """Вкладка «Закриття»: розрахунок ЗП людини по кожному закритому місяцю."""
+    out = []
+    for c in closings:
+        r = next((x for x in c.get("people", []) if x.get("cabinet") == name), None)
+        if not r:
+            continue
+        x = {k: r.get(k) for k in CLOSE_FIELDS}
+        x.update(month=c["month"], approved=bool(c.get("approved")), snapshot=(c.get("snapshot") or c.get("generated") or "")[:10],
+                 tasks=[{k: t.get(k) for k in ("t", "u", "p", "pay", "h", "rep")} for t in r.get("tasks", [])],
+                 old_items=r.get("old_items") or [], return_card=c.get("return_card", "") if (r.get("to_pay") or 0) < 0 else "",
+                 plan=next(({"code": code, "hours": pl["hours"], "pph": pl["premium_per_hour"]} for code, pl in
+                            (c.get("plans") or {}).items() if pl.get("head") == r.get("key")), None))
+        out.append(x)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def enc(payload, login, password):
     salt, iv = os.urandom(16), os.urandom(12)
     key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, ITER, 32)
@@ -227,6 +262,7 @@ def main():
             d["mgr"][j["name"]] = j["manager"]
     month = max(r["month"] for r in d["employees"])
     today = max(dt.date.fromisoformat(r["date"]) for r in d["emp_history"])
+    closings = load_closings(os.environ.get("CLOSING_DIR", ""))
     keys = json.load(open(keys_path, encoding="utf-8"))
     names = sorted({r["employee"] for r in d["employees"] if r["month"] == month})
     entries, built = [], []
@@ -234,6 +270,7 @@ def main():
         if name not in keys:
             continue
         p = build_one(name, d, month, today)
+        p["closing"] = closing_for(name, closings)
         entries.append(enc(p, keys[name]["login"], keys[name]["password"]))
         built.append(name)
     entries.sort(key=lambda e: e["k"])
