@@ -12,9 +12,13 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "snapshot — знімок; calc — знімок + чернетка нарахування"
+        description: "snapshot — знімок; calc — знімок + чернетка нарахування; close — знімок + закриття місяця (PAY_MONTH або попередній)"
         required: false
         default: "snapshot"
+      month:
+        description: "Місяць закриття YYYY-MM (для close; порожньо — попередній)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -35,6 +39,7 @@ jobs:
       WS_API_KEY: ${{ secrets.WS_API_KEY }}
       DASH_PASS: ${{ secrets.DASH_PASS }}
       PAY_MODE: ${{ inputs.mode || 'snapshot' }}
+      PAY_MONTH: ${{ inputs.month || '' }}
     steps:
       - name: Лише 03:40 за Києвом (зимовий/літній час)
         id: gate
@@ -64,7 +69,18 @@ jobs:
           fi
       - name: Знімок задач PAID\CLOSE
         if: steps.gate.outputs.run == 'yes'
-        run: python wspay.py
+        run: |
+          if [ "$PAY_MODE" = "close" ]; then PAY_MODE=snapshot python wspay.py; else python wspay.py; fi
+      - name: Закриття місяця (1-го числа о 03:40 або вручну mode=close)
+        if: steps.gate.outputs.run == 'yes'
+        run: |
+          DAY=$(TZ=Europe/Kyiv date +%d)
+          if [ "$PAY_MODE" = "close" ] || { [ "${{ github.event_name }}" = "schedule" ] && [ "$DAY" = "01" ]; }; then
+            pip install --quiet openpyxl
+            python wsclose.py
+          else
+            echo "Не день закриття — пропускаю"
+          fi
       - name: Зашифрувати й зберегти
         if: always() && steps.gate.outputs.run == 'yes'
         run: |
