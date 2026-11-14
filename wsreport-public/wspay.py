@@ -11,7 +11,8 @@
   * рахується весь час у треку задачі (без відсічки за місяцем), кожному — те, що він сам списав;
   * записи часу коротші за 10 хвилин не рахуються;
   * мітки: «Оплачувана» → у премію; «Не оплачувана» → рухає сальдо, не оплачується; «Гарантія» → лише показник;
-    «ІТС» має йти разом з «Оплачувана»; задачі без мітки виду оплати — окремий список для ручного рішення;
+    «ІТС» — завжди оплачувана робота (уточнено 14.11.2026); задачі без мітки виду оплати — окремий список;
+  * PAID\\CLOSE беремо за всі періоди: списання часу читаються з PAY_HISTORY_START;
   * пресейл: батьківська задача CLOSE - Won / CLOSE - Lost — лише аналітика; рахуються її підзадачі в PAID\\CLOSE.
 
 Етап 1 нічого не пише у Worksection. Переведення в ⛔️Definitively closed і коментарі We.Bit — етап 2,
@@ -33,6 +34,7 @@ import wsreport as W
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "output", "pay")
+PAY_HISTORY_START = "2020-01-01"   # усі періоди: час у треку задач з самого початку
 MIN_ENTRY_HOURS = 10 / 60.0          # записи коротші за 10 хвилин не рахуються
 GROW_EPS = 0.01                      # поріг росту годин, год
 
@@ -45,16 +47,16 @@ def tag_list(t):
 
 
 def pay_kind(tags, cfg):
-    """Вид оплати задачі за мітками → paid / unpaid / guarantee / its_no_paid / none."""
+    """Вид оплати задачі за мітками → paid / unpaid / guarantee / none. «ІТС» — завжди оплачувана."""
     s = {x.strip() for x in tags}
+    if s & W.TEAM_TAGS:
+        return "paid"
     if s & set(cfg["guarantee_tags"]):
         return "guarantee"
     if "Не оплачувана" in s:
         return "unpaid"
     if cfg["paid_tag"] in s:
         return "paid"
-    if s & W.TEAM_TAGS:
-        return "its_no_paid"          # ІТС без «Оплачувана» — на ручне рішення
     return "none"
 
 
@@ -133,7 +135,7 @@ def main():
     ws = W.Worksection(cfg["account"], cfg["api_key"])
     now = dt.datetime.now()
     today = now.date()
-    start = W.parse_date(cfg.get("pay_history_start") or cfg.get("history_start") or "2026-01-01")
+    start = W.parse_date(cfg.get("pay_history_start") or PAY_HISTORY_START)
 
     costs = W.load_costs(ws, start, today)
     tasks = load_tasks(ws, costs)
@@ -142,6 +144,10 @@ def main():
     state_path = os.path.join(OUT, "tasks_state.json")
     hist_path = os.path.join(OUT, "history.jsonl")
     prev = read_json(state_path, {})          # {tid: {...}} задачі, що були в PAID\CLOSE на минулий знімок
+    meta_path = os.path.join(OUT, "meta.json")
+    meta = read_json(meta_path, {})
+    # змінився період читання часу → години перераховано, це не ріст: оновлюємо базу без сигналів
+    rebase = meta.get("history_start") != start.isoformat()
     cur, events = {}, []
 
     def task_rec(tid, t, stage):
@@ -160,8 +166,8 @@ def main():
             old = prev.get(tid)
             if old:
                 rec["paid_since"] = old.get("paid_since")
-                rec["hours_at_paid"] = old.get("hours_at_paid", old.get("hours"))
-                if rec["hours"] > old.get("hours", 0) + GROW_EPS:
+                rec["hours_at_paid"] = rec["hours"] if rebase else old.get("hours_at_paid", old.get("hours"))
+                if not rebase and rec["hours"] > old.get("hours", 0) + GROW_EPS:
                     events.append({"date": today.isoformat(), "event": "hours_grew", "task": tid,
                                    "from": old.get("hours"), "to": rec["hours"], "by_user": rec["by_user"]})
             else:
@@ -181,6 +187,7 @@ def main():
                        "hours": old.get("hours"), "name": old.get("name"), "page": old.get("page")})
 
     write_json(state_path, cur)
+    write_json(meta_path, {"history_start": start.isoformat(), "last_run": now.isoformat(timespec="seconds")})
     write_json(os.path.join(OUT, "snapshots", today.isoformat() + ".json"), cur)
     if events:
         os.makedirs(OUT, exist_ok=True)
@@ -202,7 +209,7 @@ def main():
         people = defaultdict(lambda: defaultdict(float))
         manual = []
         for tid, rec in cur.items():
-            if rec["pay"] in ("none", "its_no_paid"):
+            if rec["pay"] == "none":
                 manual.append({k: rec.get(k) for k in ("id", "name", "page", "project", "pay", "hours", "by_user")})
                 continue
             for who, h in rec["by_user"].items():
