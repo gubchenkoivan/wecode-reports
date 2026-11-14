@@ -296,8 +296,29 @@ footer{font-size:13px;color:var(--muted);text-align:center}
     const sg = (x) => (x > 0 ? '+' : x < 0 ? '−' : '') + (Math.round(Math.abs(x) * 100) / 100).toLocaleString('uk-UA');
     const PAY = { paid: ['ok', 'Оплачувана'], unpaid: ['warn', 'Не оплачувана'], guarantee: ['', 'Гарантія'], none: ['bad', 'без мітки'] };
     const mName = (m) => { const [y, mm] = m.split('-').map(Number); return MONTHS[mm - 1] + ' ' + y; };
-    const sel = el('div', 'filters'); const body = el('div', 'pg'); let cur = 0;
-    if (L.length > 1) { L.forEach((x, i) => { const b = el('button', null, mName(x.month)); b.type = 'button'; b.setAttribute('aria-pressed', String(i === cur)); b.onclick = () => { cur = i; sel.querySelectorAll('button').forEach((q) => q.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); draw(); }; sel.append(b); }); wrap.append(sel); }
+    const body = el('div', 'pg'); let cur = 0;
+    try { const m = localStorage.getItem('cab_close_m'); const k = L.findIndex((x) => x.month === m); if (k >= 0) cur = k; } catch (e) {}
+    // історія: усі закриті місяці — вибір місяця і зведення по кожному
+    const hp0 = el('section', 'panel'); const hh0 = el('div', 'sg-row'); hh0.style.justifyContent = 'space-between'; hh0.append(el('h2', null, 'Мої закриття · ' + L.length + ' міс.'));
+    const pick = el('select'); pick.id = 'close-month'; pick.setAttribute('aria-label', 'Місяць закриття');
+    L.forEach((x, i) => { const o = el('option', null, mName(x.month) + (x.approved ? '' : ' (чернетка)')); o.value = String(i); pick.append(o); });
+    const navb = el('div', 'sg-row'); const bPrev = el('button', null, '← Раніше'); const bNext = el('button', null, 'Пізніше →'); bPrev.type = bNext.type = 'button';
+    navb.append(bPrev, pick, bNext); hh0.append(navb); hp0.append(hh0);
+    const htw = el('div', 'tw'); const ht = el('table'); const hth = el('thead'); const hr0 = el('tr');
+    ['Місяць', 'Годин', 'Норма / план', 'Сальдо на кінець', 'Премія / погодинна', 'Нараховано', 'Статус'].forEach((q) => hr0.append(el('th', null, q))); hth.append(hr0); ht.append(hth);
+    const hb = el('tbody'); ht.append(hb); htw.append(ht); hp0.append(htw);
+    hp0.append(el('p', 'muted small', 'Кожен закритий місяць зберігається окремо: натисніть рядок або виберіть місяць, щоб побачити розрахунок і задачі того місяця.'));
+    wrap.append(hp0);
+    const rowsH = L.map((x, i) => { const r = el('tr'); r.tabIndex = 0; r.style.cursor = 'pointer';
+      const tot = (x.paid || 0) + (x.unpaid || 0) + (x.old || 0); const isF = x.type === 'F' || !!x.plan;
+      r.append(el('td', null, mName(x.month)), el('td', 'n', h1(x.plan ? x.dept_hours : tot)), el('td', 'n', x.plan ? String(x.plan.hours) : x.norm != null ? String(x.norm) : '—'),
+        el('td', 'n' + (isF && x.s1 < 0 ? ' late' : ''), isF ? sg(x.s1) : '—'), el('td', 'n', money(x.premium || x.hourly || 0)), el('td', 'n', money((x.accrual || 0) + (x.comp || 0))));
+      const st = el('td'); st.append(el('span', 'pill ' + (x.approved ? 'ok' : 'warn'), x.approved ? 'Затверджено' : 'Чернетка')); r.append(st);
+      const go = () => setCur(i); r.onclick = go; r.onkeydown = (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); } }; hb.append(r); return r; });
+    function setCur(i) { cur = i; pick.value = String(i); bPrev.disabled = i >= L.length - 1; bNext.disabled = i <= 0;
+      rowsH.forEach((r, k) => { r.style.background = k === i ? 'var(--accent-soft)' : ''; r.setAttribute('aria-selected', String(k === i)); });
+      try { localStorage.setItem('cab_close_m', L[i].month); } catch (e) {} draw(); }
+    pick.onchange = () => setCur(Number(pick.value)); bPrev.onclick = () => setCur(Math.min(L.length - 1, cur + 1)); bNext.onclick = () => setCur(Math.max(0, cur - 1));
     wrap.append(body);
     function draw() {
       body.replaceChildren(); const x = L[cur]; const isH = !!x.plan; const isPT = x.type === 'PT'; const isF = x.type === 'F' || isH;
@@ -355,7 +376,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
       }
       body.append(el('p', 'note', 'Якщо бачите помилку в годинах чи задачах — напишіть керівнику до виплати. Якщо задачу з PAID\\CLOSE повернуть у роботу, We.Bit попросить у коментарі пояснення.'));
     }
-    draw(); return wrap;
+    setCur(cur); return wrap;
   }
   function p80Box(me) {
     const p = el('section', 'panel'); p.append(el('h2', null, '🎯 20/80 — що довести до оплати першим'));

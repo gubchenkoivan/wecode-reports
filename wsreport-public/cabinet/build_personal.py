@@ -209,8 +209,8 @@ def load_closings(cdir):
     return res
 
 
-def closing_for(name, closings, limit=6):
-    """Вкладка «Закриття»: розрахунок ЗП людини по кожному закритому місяцю."""
+def closing_for(name, closings, limit=None):
+    """Вкладка «Закриття»: розрахунок ЗП людини по кожному закритому місяцю (усі місяці, найновіші першими)."""
     out = []
     for c in closings:
         r = next((x for x in c.get("people", []) if x.get("cabinet") == name), None)
@@ -223,7 +223,7 @@ def closing_for(name, closings, limit=6):
                  plan=next(({"code": code, "hours": pl["hours"], "pph": pl["premium_per_hour"]} for code, pl in
                             (c.get("plans") or {}).items() if pl.get("head") == r.get("key")), None))
         out.append(x)
-        if len(out) >= limit:
+        if limit and len(out) >= limit:
             break
     return out
 

@@ -40,6 +40,8 @@ jobs:
       DASH_PASS: ${{ secrets.DASH_PASS }}
       PAY_MODE: ${{ inputs.mode || 'snapshot' }}
       PAY_MONTH: ${{ inputs.month || '' }}
+      REMIND_FROM: ${{ vars.REMIND_FROM }}
+      REOPEN_MODE: ${{ vars.REOPEN_MODE || 'on' }}
     steps:
       - name: Лише 03:40 за Києвом (зимовий/літній час)
         id: gate

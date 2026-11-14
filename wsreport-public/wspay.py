@@ -15,8 +15,9 @@
   * PAID\\CLOSE беремо за всі періоди: списання часу читаються з PAY_HISTORY_START;
   * пресейл: батьківська задача CLOSE - Won / CLOSE - Lost — лише аналітика; рахуються її підзадачі в PAID\\CLOSE.
 
-Етап 1 нічого не пише у Worksection. Переведення в ⛔️Definitively closed і коментарі We.Bit — етап 2,
-тільки після підтвердження Івана.
+Знімок нічого не змінює в задачах. Єдине, що пише у Worksection, — wsreopen.py (коментарі We.Bit і CANCELLED
+для задач, повернутих з PAID\\CLOSE у роботу; погоджено з Іваном). Переведення в ⛔️Definitively closed — лише
+після підтвердження Івана.
 
 Репозиторій публічний: у лог виводяться лише кількості, без імен і годин. Усі дані — у зашифрованому pay.enc.
 
@@ -31,6 +32,7 @@ import os
 from collections import defaultdict
 
 import wsreport as W
+import wsreopen
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "output", "pay")
@@ -194,6 +196,14 @@ def main():
         with open(hist_path, "a", encoding="utf-8") as f:
             for e in events:
                 f.write(json.dumps(e, ensure_ascii=False) + "\n")
+    # повернуті з PAID\CLOSE у роботу: коментарі We.Bit → CANCELLED (з листопада 2026)
+    watch_path = os.path.join(OUT, "reopen_watch.json")
+    watch = read_json(watch_path, {})
+    rs = wsreopen.run(ws, cfg, tasks, events, watch, today, set(cfg.get("holidays") or []),
+                      from_email=os.environ.get("REMIND_FROM", ""))
+    write_json(watch_path, watch)
+    print("Повернуті в роботу: нових %d, коментар 1 — %d, коментар 2 — %d, у CANCELLED — %d, знято %d, помилок %d, під наглядом %d"
+          % (rs["reopen_new"], rs["reopen_c1"], rs["reopen_c2"], rs["reopen_cancel"], rs["reopen_resolved"], rs["reopen_errors"], len(watch)))
     alerts = [e for e in events if e["event"] in ("hours_grew", "reopened")]
     write_json(os.path.join(OUT, "alerts_latest.json"), {"date": today.isoformat(), "alerts": alerts})
 
