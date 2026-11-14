@@ -336,7 +336,7 @@ footer{font-size:13px;color:var(--muted);text-align:center}
       if (isF) kpi(ks, 'Премія', money(x.premium), x.premium ? h1(x.premium_h) + ' год × ' + x.rate + ' грн' : 'премія нараховується, коли сальдо виходить у плюс', x.premium ? 'ok' : '');
       if (isPT) kpi(ks, 'Погодинна оплата', money(x.hourly), h1((x.paid || 0) + (x.old || 0)) + ' опл. год × ' + x.rate + ' грн');
       kpi(ks, 'Нараховано', money((x.accrual || 0) + (x.comp || 0)), (isF ? 'оклад ' + money(x.oklad) + (x.premium ? ' + премія' : '') : 'за оплачувані години') + (x.comp ? ' + компенсація ' + money(x.comp) : ''));
-      if (x.card || x.official) kpi(ks, x.to_pay < 0 ? 'До повернення' : 'До виплати', money(Math.abs(x.to_pay)), 'уже виплачено ' + money(x.card) + (x.official ? ' · офіційна частина ' + money(x.official) : '') + (x.return_card ? ' · повернення на картку ' + x.return_card : ''), x.to_pay < 0 ? 'warn' : '');
+      if ((x.card || x.official) && !x.via) kpi(ks, x.to_pay < 0 ? 'До повернення' : 'До виплати', money(Math.abs(x.to_pay)), 'уже виплачено ' + money(x.card) + (x.official ? ' · офіційна частина ' + money(x.official) : '') + (x.return_card ? ' · повернення на картку ' + x.return_card : ''), x.to_pay < 0 ? 'warn' : '');
       hp.append(ks); body.append(hp);
       // як рахується
       if (isF) {
